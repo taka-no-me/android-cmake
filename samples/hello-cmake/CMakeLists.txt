@@ -13,6 +13,7 @@ set( EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/bin CACHE PATH
 set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib CACHE PATH
         "Single Directory for all Libraries")
 
+set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -pedantic" )
 if(NOT ANDROID)
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})

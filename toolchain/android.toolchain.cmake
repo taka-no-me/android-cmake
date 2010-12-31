@@ -25,18 +25,18 @@ SET(CMAKE_SYSTEM_NAME Linux)
 #this one not so much
 SET(CMAKE_SYSTEM_VERSION 1)
 
-#set cache for android toolchain
-set(ANDROID_NDK_TOOLCHAIN_ROOT /android-ndkr5-toolchain/ CACHE PATH 
-    "The root path of the ndk toolchain")
+#set path for android toolchain
+set(ANDROID_NDK_TOOLCHAIN_ROOT /opt/android-toolchain)
     
 if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
-  message(FATAL_ERROR "You must set the tool chain root directory in you cmake cache.")
+  message(FATAL_ERROR " ${ANDROID_NDK_TOOLCHAIN_ROOT} does not exist!
+  You should sudo ln -s ~/android-toolchain /opt/android-toolchain.")
 endif()
 
 
 # specify the cross compiler
-SET(CMAKE_C_COMPILER   ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc)
-SET(CMAKE_CXX_COMPILER ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++)
+SET(CMAKE_C_COMPILER   ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc )
+SET(CMAKE_CXX_COMPILER ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ )
 
 # where is the target environment 
 SET(CMAKE_FIND_ROOT_PATH ${ANDROID_NDK_TOOLCHAIN_ROOT})
