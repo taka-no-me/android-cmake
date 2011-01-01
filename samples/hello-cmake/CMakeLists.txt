@@ -6,15 +6,17 @@ project(hello-cmake)
 #this is necessary to pick up android flags
 set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -pedantic" )
 
+#test for ANDROID and look for stuff not relevant to android.
 if(NOT ANDROID)
-#jni should work on a pc
+#jni is available by default on android
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
-set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib/pc CACHE PATH
-        "Single Directory for all Libraries")
 endif()
 
+#this will be overridden by the android toolchain
+set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib/pc CACHE PATH
+        "Single Directory for all Libraries")
+        
 #make sure to used shared in in the jni library, as this will be loaded by
 #java
 add_library(hello-cmake SHARED hello-cmake.c)
-
