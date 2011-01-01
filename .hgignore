@@ -6,6 +6,7 @@ syntax: glob
 *~
 *.class
 lib
+gen
 *.so
 *build
 # switch to regexp syntax.

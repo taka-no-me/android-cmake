@@ -26,7 +26,8 @@
 #     LIBRARY_OUTPUT_PATH_ROOT should be set in cache to determine where android
 #     libraries will be installed.
 #        default is ${CMAKE_SOURCE_DIR} , and the android libs will always be
-#        under ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi* depending on target.
+#        under ${LIBRARY_OUTPUT_PATH_ROOT}/libs/armeabi* depending on target.
+#        this will be convenient for android linking
 #
 #     Base system is Linux, but you may need to change things 
 #     for android compatibility.
@@ -92,7 +93,7 @@ set(LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH
 #set these flags for client use
 if(ARM_TARGETS STREQUAL "armeabi")
   set(ARMEABI true)
-  set(LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi
+  set(LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/libs/armeabi
       CACHE PATH "path for android libs" FORCE)
   set(NEON false)
 else()
@@ -100,7 +101,7 @@ else()
     set(NEON true)
   endif()
   set(ARMEABI_V7A true)
-  set( LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi-v7a 
+  set( LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/libs/armeabi-v7a 
        CACHE PATH "path for android libs" FORCE)
 endif()
 

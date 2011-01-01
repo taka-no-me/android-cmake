@@ -1,3 +1,3 @@
 #!/bin/bash
-javac HelloWorld.java
-
+#javac HelloWorld.java
+cd java && ant

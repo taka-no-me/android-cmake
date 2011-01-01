@@ -24,7 +24,7 @@
  *
  *   apps/samples/hello-jni/project/src/com/example/HelloJni/HelloJni.java
  */
-JNIEXPORT jstring JNICALL Java_HelloWorld_stringFromJNI
+JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloWorld_stringFromJNI
   (JNIEnv *env, jobject obj)
 {
     return (*env)->NewStringUTF(env, "Hello from JNI !");
