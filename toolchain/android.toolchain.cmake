@@ -68,14 +68,6 @@ SET(CMAKE_C_COMPILER
 SET(CMAKE_CXX_COMPILER 
   ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ )
 
-# where is the target environment 
-SET(CMAKE_FIND_ROOT_PATH ${ANDROID_NDK_TOOLCHAIN_ROOT})
-
-# only search for programs in the ndk toolchain
-SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
-# only search for libraries and includes in the ndk toolchain
-SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 #setup build targets, mutually exclusive
 set(PossibleArmTargets
@@ -95,6 +87,8 @@ if(ARM_TARGETS STREQUAL "armeabi")
   set(ARMEABI true)
   set(LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/libs/armeabi
       CACHE PATH "path for android libs" FORCE)
+  set(CMAKE_INSTALL_PREFIX ${ANDROID_NDK_TOOLCHAIN_ROOT}/user/armeabi
+      CACHE STRING "path for installing" FORCE)
   set(NEON false)
 else()
   if(ARM_TARGETS STREQUAL "armeabi-v7a with NEON")
@@ -103,7 +97,22 @@ else()
   set(ARMEABI_V7A true)
   set( LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/libs/armeabi-v7a 
        CACHE PATH "path for android libs" FORCE)
+  set(  CMAKE_INSTALL_PREFIX ${ANDROID_NDK_TOOLCHAIN_ROOT}/user/armeabi-v7a
+      CACHE STRING "path for installing" FORCE)
 endif()
+
+# where is the target environment 
+SET(CMAKE_FIND_ROOT_PATH ${ANDROID_NDK_TOOLCHAIN_ROOT} ${CMAKE_INSTALL_PREFIX})
+
+#for some reason this is needed? TODO figure out why...
+include_directories(${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi/include/c++/4.4.3/arm-linux-androideabi)
+
+# only search for programs in the ndk toolchain
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+# only search for libraries and includes in the ndk toolchain
+SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
 
 #It is recommended to use the -mthumb compiler flag to force the generation
 #of 16-bit Thumb-1 instructions (the default being 32-bit ARM ones).
@@ -121,11 +130,16 @@ if(ARMEABI_V7A)
 
 endif()
 
-#Also, is is *required* to use the following linker flags that routes around
+#Also, this is *required* to use the following linker flags that routes around
 #a CPU bug in some Cortex-A8 implementations:
-SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8")
-SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8")
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined,--fix-cortex-a8,-lsupc++ -lstdc++ -L${CMAKE_INSTALL_PREFIX}/lib")
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--no-undefined,--fix-cortex-a8,-lsupc++ -lstdc++ -L${CMAKE_INSTALL_PREFIX}/lib")
 
 #set these global flags for cmake client scripts to change behavior
 set(ANDROID True)
 set(BUILD_ANDROID True)
+
+include_directories(${CMAKE_INSTALL_PREFIX}/include)
+#link_directories()
+
+
