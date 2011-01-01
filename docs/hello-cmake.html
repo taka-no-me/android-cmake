@@ -1,11 +1,16 @@
 <html><body><pre>Hello CMake
-
-Introduction:
+<h3>
+Introduction
 -------------
+</h3>
 A short tutorial on using cmake and the android ndk standalone toolchain.
-
-I. Requirements:
+<h3>
+I. Requirements
 ----------------
+</h3>
+You will need ant to compile the java.
+  sudo apt-get install ant
+
 You must have the android standalone toolchain either in /opt/android-toolchain
 or have the environment variable set:
   export ANDROID_NDK_TOOLCHAIN_ROOT=$HOME/android-toolchain
@@ -16,9 +21,10 @@ convience of this tutorial.
   
 Highly recommended that you either use cmake-gui or ccmake to step through the
 cmake process. 
-  
-2. Build for the PC
+<h3>
+II. Build for the PC
 -------------------
+</h3>
 cd to the samples/hello-cmake directory
   mkdir pcbuild
   cd pcbuild
@@ -32,9 +38,10 @@ Now build the java. cd to samples/hello-cmake
 
 If you look in run_java.sh, it exports the lib/pc path (where the shared library
 was put), so that the java may load the shared library.
-
-3.  Build for the Android
+<h3>
+III.  Build for the Android
 -------------------
+</h3>
 cd to the samples/hello-cmake directory
   export ANDROID_NDK_TOOLCHAIN_ROOT=~/android-toolchain
   export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake
@@ -44,34 +51,37 @@ cd to the samples/hello-cmake directory
   make
 
 You should see something like:
-  Linking C shared library ../lib/armeabi-v7a/libhello-cmake.so
+  Linking C shared library ../libs/armeabi-v7a/libhello-cmake.so
 
 Try cmake-gui and play with the arm targets and such.
 
-Please look at the cmake lists:
------------------
-cmake_minimum_required(VERSION 2.8)
+Please look at the cmake lists, it simple and commented.
 
-project(hello-cmake)
+<h3>
+IV. Install for Android
+-------------------
+</h3>
+Lets get this shared library ready for android.
 
-#notice the "recycling" of CMAKE_C_FLAGS
-#this is necessary to pick up android flags
-set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -pedantic" )
+  cd androidbuild
+  cmake-gui ..
 
-#test for ANDROID and look for stuff not relevant to android.
-if(NOT ANDROID)
-#jni is available by default on android
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-endif()
+Now in select armeabi for ARM_TARGETS.  This is created by the android.toolchain
+and determines the abi compatibility of the shared library.  It will also change
+the install directory of the shared library.
 
-#this will be overridden by the android toolchain
-set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib/pc CACHE PATH
-        "Single Directory for all Libraries")
-        
-#make sure to used shared in in the jni library, as this will be loaded by
-#java
-add_library(hello-cmake SHARED hello-cmake.c)
----------------------
+Also, point the LIBRARY_OUTPUT_PATH_ROOT to samples/hello-android-cmake path.
+This has the effect of installing the shared library into the correct folder
+for android sdk build system.
 
+  make
+
+Now rerun cmake-gui and select armeabi-v7a for the ARM_TARGETS. Run make,
+and you should now see the two versions of the shared library installed in
+the hello-android-cmake/libs directory.
+
+You may want to set the advanced CMAKE_VERBOSE_MAKEFILE flag from cmake-gui, to
+see the compiler and linker flags.
+ 
+Now you are ready to move on to the <a href="hello-android-cmake.html">hello-android-cmake.html</a> sample.
 </pre></body></html>

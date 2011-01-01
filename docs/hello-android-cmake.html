@@ -1,0 +1,30 @@
+<html><body><pre>Hello Android CMake
+<h3>
+Introduction
+-------------
+</h3>
+Lets now get our jni library running on android
+<h3>
+I. Requirements
+----------------
+</h3>
+Android sdk, eclipse plugin. (if you're here, we'll assume you have and are
+comfortable with these)
+
+Built the <a href="hello-cmake.html">Hello CMake</a> project.
+
+<h3>  
+II. Open eclipse project
+----------------
+</h3>
+Open up eclipse and start an android project from existing source. Select the
+hello-android-cmake directory.
+
+Assuming you built and installed the native libraries, you should be able to
+run on an emulator or device with out issue. Verify that there are libhello-cmake.so
+files in the libs/armeabi and libs/armeabi-v7a directories.
+
+I dupplicated the HelloWorld.java file from the Hello CMake tutorial in the source
+folder for simplicity, but you could also import an existing <a href="http://developer.android.com/guide/appendix/faq/commontasks.html#addexternallibrary">java jar file</a>.
+
+
