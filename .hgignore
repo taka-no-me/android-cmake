@@ -1,12 +1,20 @@
 # use glob syntax.
 syntax: glob
-
+bin
+gen
+libs
+*.cfg
+.project
+.cproject
+.settings
+.classpath
 *.elc
 *.pyc
 *~
 *.class
 lib
 gen
+
 *.so
 *build
 # switch to regexp syntax.
