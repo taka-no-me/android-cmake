@@ -16,6 +16,7 @@ lib
 gen
 boost_1_45_0
 download
+eigen-android
 
 *.so
 *build
