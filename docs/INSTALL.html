@@ -1,0 +1,28 @@
+<html><body><pre>Android CMake Installation
+
+Introduction:
+-------------
+Please read <a href="OVERVIEW.html">OVERVIEW.html</a>.
+This file gives instructions on how to properly setup your NDK for cmake.
+
+
+I. Requirements:
+----------------
+These instructions will work on Linux, but may work on Mac OSX 
+or Windows with slight modification.
+
+The android-ndk-r5 get it here:
+<a href="http://developer.android.com/sdk/ndk/index.html">
+http://developer.android.com/sdk/ndk/index.html</a>
+
+Read its documentation, specifically the Standalone Toolchain.
+
+Assumming you read the documentation, follow steps for creating a standalone
+toolchain.
+  export NDK=~/android-ndk-r5
+  $NDK/build/tools/make-standalone-toolchain.sh --platform=android-5 \
+    --install-dir=$HOME/android-toolchain
+
+Lets try the <a href="hello-cmake.html">hello-cmake</a> sample.
+
+</pre></body></html>

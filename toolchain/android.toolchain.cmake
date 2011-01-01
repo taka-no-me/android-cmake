@@ -1,20 +1,35 @@
 # ----------------------------------------------------------------------------
 #  Android CMake toolchain file, for use with the ndk r5 standalone toolchain
+# 
+#  you must either place the android standalone toolchain in 
+#     /opt/android-toolchain
+#  or define something like the following before running cmake for 
+#  the first time.
+#     export ANDROID_NDK_TOOLCHAIN_ROOT=~/android-toolchain/
+#
+#  run cmake with 
+#       -DCMAKE_TOOLCHAIN_FILE=~/android.toolchain.cmake
+#  or use cmake-gui/ccmake
 #
 #  What?:
-#    Make sure to do the following in your scripts:
-#    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${my_cxx_flags}")
-#    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${my_cxx_flags}")
-#     The flags will be prepopulated with critical flags, so don't loose them.
+#     Make sure to do the following in your scripts:
+#       SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${my_cxx_flags}")
+#       SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${my_cxx_flags}")
+#       The flags will be prepopulated with critical flags, so don't loose them.
 #    
-#    ANDROID and BUILD_ANDROID will be set to true, you may test these variables
-#    to make necessary changes.
+#     ANDROID and BUILD_ANDROID will be set to true, you may test these 
+#     variables to make necessary changes.
 #    
-#    Also ARMEABI and ARMEABI_V7A will be set true, mutually exclusive. V7A is
-#    for floating point. NEON option will turn on neon instructions.
+#     Also ARMEABI and ARMEABI_V7A will be set true, mutually exclusive. V7A is
+#     for floating point. NEON option will turn on neon instructions.
 #
-#    Base system is Linux, but you may need to change things 
-#    for android compatibility.
+#     LIBRARY_OUTPUT_PATH_ROOT should be set in cache to determine where android
+#     libraries will be installed.
+#        default is ${CMAKE_SOURCE_DIR} , and the android libs will always be
+#        under ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi* depending on target.
+#
+#     Base system is Linux, but you may need to change things 
+#     for android compatibility.
 #   
 #
 #   - initial version December 2010 Ethan Rublee ethan.ruble@gmail.com
@@ -25,18 +40,32 @@ SET(CMAKE_SYSTEM_NAME Linux)
 #this one not so much
 SET(CMAKE_SYSTEM_VERSION 1)
 
-#set path for android toolchain
-set(ANDROID_NDK_TOOLCHAIN_ROOT /opt/android-toolchain)
-    
+#set path for android toolchain (hard coded for now)
+set(ANDROID_NDK_TOOLCHAIN_ROOT $ENV{ANDROID_NDK_TOOLCHAIN_ROOT})
+
 if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
-  message(FATAL_ERROR " ${ANDROID_NDK_TOOLCHAIN_ROOT} does not exist!
-  You should sudo ln -s ~/android-toolchain /opt/android-toolchain.")
+set(ANDROID_NDK_TOOLCHAIN_ROOT /opt/android-toolchain)
+message("Using default path for toolchain
+${ANDROID_NDK_TOOLCHAIN_ROOT}")
 endif()
 
-
+set(ANDROID_NDK_TOOLCHAIN_ROOT ${ANDROID_NDK_TOOLCHAIN_ROOT} CACHE PATH
+    "root of the android ndk standalone toolchain" FORCE)
+    
+if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
+  message(FATAL_ERROR
+  "${ANDROID_NDK_TOOLCHAIN_ROOT} does not exist!
+  You should either set an environment variable:
+    export ANDROID_NDK_TOOLCHAIN_ROOT=~/my-toolchain
+  or put the toolchain in the default path:
+    sudo ln -s ~/android-toolchain /opt/android-toolchain
+    ")
+endif()
 # specify the cross compiler
-SET(CMAKE_C_COMPILER   ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc )
-SET(CMAKE_CXX_COMPILER ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ )
+SET(CMAKE_C_COMPILER   
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc )
+SET(CMAKE_CXX_COMPILER 
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ )
 
 # where is the target environment 
 SET(CMAKE_FIND_ROOT_PATH ${ANDROID_NDK_TOOLCHAIN_ROOT})
@@ -49,17 +78,30 @@ SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 #setup build targets, mutually exclusive
 set(PossibleArmTargets
-  "armeabi;armeabi-v7a")
+  "armeabi;armeabi-v7a;armeabi-v7a with NEON")
 set(ARM_TARGETS "armeabi-v7a" CACHE STRING 
     "the arm targets for android, recommend armeabi-v7a 
     for floating point support and NEON.")
+
 set_property(CACHE ARM_TARGETS PROPERTY STRINGS ${PossibleArmTargets} )
 
+set(LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH 
+    "root for library output, set this to change where
+    android libs are installed to")
+    
 #set these flags for client use
 if(ARM_TARGETS STREQUAL "armeabi")
   set(ARMEABI true)
+  set(LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi
+      CACHE PATH "path for android libs" FORCE)
+  set(NEON false)
 else()
+  if(ARM_TARGETS STREQUAL "armeabi-v7a with NEON")
+    set(NEON true)
+  endif()
   set(ARMEABI_V7A true)
+  set( LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/lib/armeabi-v7a 
+       CACHE PATH "path for android libs" FORCE)
 endif()
 
 #It is recommended to use the -mthumb compiler flag to force the generation
@@ -67,8 +109,7 @@ endif()
 SET(CMAKE_CXX_FLAGS "-DANDROID -mthumb")
 SET(CMAKE_C_FLAGS "-DANDROID -mthumb")
 
-if(ARMEABI_V7A)
-  option(NEON true)
+if(ARMEABI_V7A)  
   #these are required flags for android armv7-a
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a -mfloat-abi=softfp")
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv7-a -mfloat-abi=softfp")

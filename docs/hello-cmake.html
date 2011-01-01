@@ -1,0 +1,69 @@
+<html><body><pre>Hello CMake
+
+Introduction:
+-------------
+A short tutorial on using cmake and the android ndk standalone toolchain.
+
+I. Requirements:
+----------------
+You must have the android standalone toolchain either in /opt/android-toolchain
+or have the environment variable set:
+  export ANDROID_NDK_TOOLCHAIN_ROOT=$HOME/android-toolchain
+
+Also, please set the android.toolchain.cmake as an evironment variable for the
+convience of this tutorial.
+  export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake
+  
+Highly recommended that you either use cmake-gui or ccmake to step through the
+cmake process. 
+  
+2. Build for the PC
+-------------------
+cd to the samples/hello-cmake directory
+  mkdir pcbuild
+  cd pcbuild
+  cmake ..
+  make
+
+Now build the java. cd to samples/hello-cmake
+  ./build_java.sh
+  ./run_java.sh
+  Hello from JNI !
+
+If you look in run_java.sh, it exports the lib/pc path (where the shared library
+was put), so that the java may load the shared library.
+
+3.  Build for the Android
+-------------------
+cd to the samples/hello-cmake directory
+  export ANDROID_NDK_TOOLCHAIN_ROOT=~/android-toolchain
+  export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake
+  mkdir androidbuild
+  cd androidbuild
+  cmake -DCMAKE_TOOLCHAIN_FILE=$ANDTOOLCHAIN ..
+  make
+  
+Try cmake-gui and play with the arm targets and such.
+
+  Please look at the cmake lists:
+  cmake_minimum_required(VERSION 2.8)
+
+  project(hello-cmake)
+
+  #notice the "recycling" of CMAKE_C_FLAGS
+  #this is necessary to pick up android flags
+  set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -pedantic" )
+
+  if(NOT ANDROID)
+  #jni should work on a pc
+  find_package(JNI REQUIRED)
+  include_directories(${JNI_INCLUDE_DIRS})
+  set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib/pc CACHE PATH
+          "Single Directory for all Libraries")
+  endif()
+
+  #make sure to used shared in in the jni library, as this will be loaded by
+  #java
+  add_library(hello-cmake SHARED hello-cmake.c)
+
+</pre></body></html>
