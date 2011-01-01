@@ -1,0 +1,6 @@
+set(Boost_INCLUDE_DIRS @Boost_INCLUDE_DIRS@)
+set(Boost_LIBRARIES @Boost_LIBRARIES@)
+link_directories(@Boost_LINK_DIRS@)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} @Boost_C_FLAGS@")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} @Boost_CXX_FLAGS@")

@@ -14,6 +14,8 @@ libs
 *.class
 lib
 gen
+boost_1_45_0
+download
 
 *.so
 *build

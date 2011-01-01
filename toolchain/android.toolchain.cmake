@@ -139,7 +139,7 @@ SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--no-undefined,--fix-cortex-a8,-lsupc++ -lstd
 set(ANDROID True)
 set(BUILD_ANDROID True)
 
-include_directories(${CMAKE_INSTALL_PREFIX}/include)
+#include_directories(${CMAKE_INSTALL_PREFIX}/include)
 #link_directories()
 
 
