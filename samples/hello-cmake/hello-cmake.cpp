@@ -14,18 +14,35 @@
  * limitations under the License.
  *
  */
-#include <string.h>
+#include <string>
+#include <iostream>
+#include <sstream>
 #include <jni.h>
-#include "HelloWorld.h"
 
-/* This is a trivial JNI example where we use a native method
- * to return a new VM String. See the corresponding Java source
- * file located at:
- *
- *   apps/samples/hello-jni/project/src/com/example/HelloJni/HelloJni.java
+#ifdef __cplusplus
+extern "C" {
+#endif
+/*
+ * Class:     com_theveganrobot_cmake_HelloWorld
+ * Method:    stringFromJNI
+ * Signature: ()Ljava/lang/String;
  */
+JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloWorld_stringFromJNI
+  (JNIEnv *, jobject);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+std::string helloStringStream(){
+  std::stringstream ss;
+  ss << "JNI -- yellow " << 2  << std::endl;
+  // ss <<  2.0 << endl; //will crash!
+  return ss.str();
+}
 JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloWorld_stringFromJNI
   (JNIEnv *env, jobject obj)
 {
-    return (*env)->NewStringUTF(env, "Hello from JNI !");
+    return env->NewStringUTF(helloStringStream().c_str());
 }

@@ -17,7 +17,7 @@ gen
 boost_1_45_0
 download
 eigen-android
-
+*.log
 *.so
 *build
 # switch to regexp syntax.
