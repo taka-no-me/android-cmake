@@ -24,11 +24,12 @@ include_directories(${boost_root} )
 
 file(GLOB lib_srcs ${boost_root}/libs/system/src/*.cpp)
 
-add_library( boost_system STATIC ${lib_srcs})
+add_library( boost_system SHARED ${lib_srcs})
 
 file(GLOB lib_srcs ${boost_root}/libs/filesystem/v2/src/*.cpp)
 
-add_library( boost_filesystem STATIC ${lib_srcs})
+add_library( boost_filesystem SHARED ${lib_srcs})
+target_link_libraries(boost_filesystem boost_system)
 
 set(Boost_INCLUDE_DIRS ${boost_root})
 set(Boost_LIBRARIES boost-filesystem boost-system )

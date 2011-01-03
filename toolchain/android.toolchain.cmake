@@ -102,13 +102,14 @@ else()
 endif()
 
 # where is the target environment 
-SET(CMAKE_FIND_ROOT_PATH ${ANDROID_NDK_TOOLCHAIN_ROOT} ${CMAKE_INSTALL_PREFIX})
+SET(CMAKE_FIND_ROOT_PATH  ${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi ${ANDROID_NDK_TOOLCHAIN_ROOT}/sysroot ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/share)
 
 #for some reason this is needed? TODO figure out why...
 include_directories(${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi/include/c++/4.4.3/arm-linux-androideabi)
 
 # only search for programs in the ndk toolchain
 SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+#SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
 # only search for libraries and includes in the ndk toolchain
 SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
@@ -116,9 +117,10 @@ SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 #It is recommended to use the -mthumb compiler flag to force the generation
 #of 16-bit Thumb-1 instructions (the default being 32-bit ARM ones).
-SET(CMAKE_CXX_FLAGS "-DANDROID -mthumb")
-SET(CMAKE_C_FLAGS "-DANDROID -mthumb")
+SET(CMAKE_CXX_FLAGS "-DANDROID -mthumb -Wno-psabi")
+SET(CMAKE_C_FLAGS "-DANDROID -mthumb -Wno-psabi")
 
+#set(LIBCPP_LINK_DIR  ${ANDROID_NDK_TOOLCHAIN_ROOT}/user/lib/thumb)
 if(ARMEABI_V7A)  
   #these are required flags for android armv7-a
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a -mfloat-abi=softfp")
@@ -127,13 +129,13 @@ if(ARMEABI_V7A)
       SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
       SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon")
   endif()
-
 endif()
-
+#-Wl,-L${LIBCPP_LINK_DIR},-lstdc++,-lsupc++
+#-L${LIBCPP_LINK_DIR} -lstdc++ -lsupc++
 #Also, this is *required* to use the following linker flags that routes around
 #a CPU bug in some Cortex-A8 implementations:
-SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined,--fix-cortex-a8,-lsupc++ -lstdc++ -L${CMAKE_INSTALL_PREFIX}/lib")
-SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--no-undefined,--fix-cortex-a8,-lsupc++ -lstdc++ -L${CMAKE_INSTALL_PREFIX}/lib")
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++")
+#SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ ")
 
 #set these global flags for cmake client scripts to change behavior
 set(ANDROID True)

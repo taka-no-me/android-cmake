@@ -19,4 +19,4 @@ set( LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib/pc CACHE PATH
         
 #make sure to used shared in in the jni library, as this will be loaded by
 #java
-add_library(hello-cmake SHARED hello-cmake.c)
+add_library(hello-cmake SHARED hello-cmake.cpp)
