@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010 Ethan Rublee
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 #include <iostream>
 #include <sstream>
 #include <jni.h>
+#include <math.h>
+#include <stdexcept>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,9 +38,17 @@ JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloWorld_stringFromJNI
 
 
 std::string helloStringStream(){
+  //test string stream
   std::stringstream ss;
-  ss << "JNI -- yellow " << 2  << std::endl;
-  // ss <<  2.0 << endl; //will crash!
+  ss << "JNI -- pi = " << M_PI  << "\n";
+  try
+  {
+    throw std::runtime_error("Do exceptions work?");
+  }
+  catch(std::runtime_error e)
+  {
+    ss << "Exception caught: " << e.what() << "\nI guess they do ;)" << std::endl;
+  }  
   return ss.str();
 }
 JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloWorld_stringFromJNI

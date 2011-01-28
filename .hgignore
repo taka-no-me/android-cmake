@@ -20,6 +20,10 @@ eigen-android
 *.log
 *.so
 *build
+CMakeLists.txt.user
+build.xml
+local.properties
+ndkr5b
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/

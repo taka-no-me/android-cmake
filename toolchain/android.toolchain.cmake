@@ -130,6 +130,10 @@ if(ARMEABI_V7A)
       SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon")
   endif()
 endif()
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" CACHE STRING "c++ flags")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "c flags")
+      
 #-Wl,-L${LIBCPP_LINK_DIR},-lstdc++,-lsupc++
 #-L${LIBCPP_LINK_DIR} -lstdc++ -lsupc++
 #Also, this is *required* to use the following linker flags that routes around

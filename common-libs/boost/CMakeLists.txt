@@ -14,12 +14,6 @@ message(FATAL_ERROR
     ")
 endif()
 
-#these are needed to make boost happy for android
-#set(boost_defs "-DBOOST_HAS_PTHREADS -DBOOST_NO_STD_WSTRING")
-
-set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${boost_defs}" )
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${boost_defs}" )
-
 include_directories(${boost_root} )
 
 file(GLOB lib_srcs ${boost_root}/libs/system/src/*.cpp)
