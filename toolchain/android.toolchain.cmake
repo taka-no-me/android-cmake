@@ -64,11 +64,22 @@ if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
 endif()
 # specify the cross compiler
 SET(CMAKE_C_COMPILER   
-  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc )
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc CACHE PATH "compiler" )
 SET(CMAKE_CXX_COMPILER 
-  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ )
-
-
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ CACHE PATH "compiler" )
+#there may be a way to make cmake deduce these TODO deduce the rest of the tools
+set(CMAKE_AR
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ar  CACHE PATH "archive")
+set(CMAKE_LINKER
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ld  CACHE PATH "linker")
+ set(CMAKE_NM
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-nm  CACHE PATH "nm")
+ set(CMAKE_OBJCOPY
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objcopy  CACHE PATH "objcopy")
+  set(CMAKE_OBJDUMP
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objdump  CACHE PATH "objdump")
+set(CMAKE_STRIP
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-strip  CACHE PATH "strip")
 #setup build targets, mutually exclusive
 set(PossibleArmTargets
   "armeabi;armeabi-v7a;armeabi-v7a with NEON")
@@ -102,7 +113,7 @@ else()
 endif()
 
 # where is the target environment 
-SET(CMAKE_FIND_ROOT_PATH  ${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi ${ANDROID_NDK_TOOLCHAIN_ROOT}/sysroot ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/share)
+SET(CMAKE_FIND_ROOT_PATH  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin ${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi ${ANDROID_NDK_TOOLCHAIN_ROOT}/sysroot ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/share)
 
 #for some reason this is needed? TODO figure out why...
 include_directories(${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi/include/c++/4.4.3/arm-linux-androideabi)

@@ -24,6 +24,8 @@ CMakeLists.txt.user
 build.xml
 local.properties
 ndkr5b
+android-ndk
+*.orig
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/
