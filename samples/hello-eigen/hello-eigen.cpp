@@ -25,19 +25,19 @@
 using namespace Eigen;
 
 std::string helloMatrix(){
-  //std::stringstream ss;
- // ss << "yellow " << 2.0 << std::endl;
+  std::stringstream ss;
+  ss << __PRETTY_FUNCTION__ << std::endl;
   MatrixXd m(2,2);
   m(0,0) = 3;
   m(1,0) = 2.5;
   m(0,1) = -1;
   m(1,1) = m(1,0) + m(0,1);
-  //ss << "Here is the matrix m:\n" << m << std::endl;
+  ss << "Here is the matrix m:\n" << m << std::endl;
   VectorXd v(2);
   v(0) = 4;
   v(1) = v(0) - 1;
-  //ss << "Here is the vector v:\n" << v << std::endl;
-  return __PRETTY_FUNCTION__;
+  ss << "Here is the vector v:\n" << v << std::endl;
+  return ss.str();
 }
 JNIEXPORT jstring JNICALL Java_com_theveganrobot_cmake_HelloEigen_helloMatrix
   (JNIEnv * env, jobject)
