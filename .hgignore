@@ -26,6 +26,7 @@ local.properties
 ndkr5b
 android-ndk
 *.orig
+tmp
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/
