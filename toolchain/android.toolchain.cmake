@@ -41,13 +41,15 @@ SET(CMAKE_SYSTEM_NAME Linux)
 #this one not so much
 SET(CMAKE_SYSTEM_VERSION 1)
 
-#set path for android toolchain (hard coded for now)
+#set path for android toolchain -- look
 set(ANDROID_NDK_TOOLCHAIN_ROOT $ENV{ANDROID_NDK_TOOLCHAIN_ROOT})
 
 if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
 set(ANDROID_NDK_TOOLCHAIN_ROOT /opt/android-toolchain)
-message("Using default path for toolchain
-${ANDROID_NDK_TOOLCHAIN_ROOT}")
+message( STATUS "Using default path for toolchain
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}")
+message( STATUS "If you prefer to use a different location, please define the environment variable:
+    ANDROID_NDK_TOOLCHAIN_ROOT")
 endif()
 
 set(ANDROID_NDK_TOOLCHAIN_ROOT ${ANDROID_NDK_TOOLCHAIN_ROOT} CACHE PATH
@@ -118,9 +120,9 @@ SET(CMAKE_FIND_ROOT_PATH  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin ${ANDROID_NDK_TOOLCH
 #for some reason this is needed? TODO figure out why...
 include_directories(${ANDROID_NDK_TOOLCHAIN_ROOT}/arm-linux-androideabi/include/c++/4.4.3/arm-linux-androideabi)
 
-# only search for programs in the ndk toolchain
+# allow programs like swig to be found -- but can be deceiving for
+# system tool dependencies.
 SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
-#SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
 # only search for libraries and includes in the ndk toolchain
 SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
@@ -128,8 +130,8 @@ SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 #It is recommended to use the -mthumb compiler flag to force the generation
 #of 16-bit Thumb-1 instructions (the default being 32-bit ARM ones).
-SET(CMAKE_CXX_FLAGS "-DANDROID -mthumb -Wno-psabi")
-SET(CMAKE_C_FLAGS "-DANDROID -mthumb -Wno-psabi")
+SET(CMAKE_CXX_FLAGS "-fPIC -DANDROID -mthumb -Wno-psabi")
+SET(CMAKE_C_FLAGS "-fPIC -DANDROID -mthumb -Wno-psabi")
 
 #set(LIBCPP_LINK_DIR  ${ANDROID_NDK_TOOLCHAIN_ROOT}/user/lib/thumb)
 if(ARMEABI_V7A)  
@@ -156,7 +158,21 @@ SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib
 set(ANDROID True)
 set(BUILD_ANDROID True)
 
-#include_directories(${CMAKE_INSTALL_PREFIX}/include)
-#link_directories()
+#SWIG junk...
+#need to search in the  host for swig to be found
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+FIND_PACKAGE(SWIG)
+set(SWIG_USE_FILE ${CMAKE_ROOT}/Modules/UseSWIG.cmake CACHE PATH "Use Swig cmake module")
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
+set(SWIG_OUTPUT_ROOT ${LIBRARY_OUTPUT_PATH_ROOT}/src CACHE PATH "Where swig generated files will be placed relative to, <SWIG_OUTPUT_ROOT>/com/mylib/foo/jni ..." FORCE)
+
+#convenience macro for swig java packages
+macro(SET_SWIG_JAVA_PACKAGE package_name)
+STRING(REGEX REPLACE "[.]" "/" package_name_output ${package_name})
+SET(CMAKE_SWIG_OUTDIR ${SWIG_OUTPUT_ROOT}/${package_name_output} )
+SET(CMAKE_SWIG_FLAGS "-package" "'${package_name}'")
+endmacro()
 
