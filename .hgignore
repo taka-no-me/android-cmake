@@ -27,6 +27,8 @@ ndkr5b
 android-ndk
 *.orig
 tmp
+log4cxx
+gtest
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/
