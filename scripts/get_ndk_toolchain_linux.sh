@@ -18,11 +18,11 @@ tar -C $destination -xf $ball
 cd $destination/android-ndk-r5b
 NDK=`pwd`
 $NDK/build/tools/make-standalone-toolchain.sh --platform=android-5 --install-dir=$destination/android-toolchain
-echo making soft link to the standalone toolchain
-sudo ln -s $destination/android-toolchain /opt/android-toolchain
-sudo rm /opt/android-toolchain
-sudo ln -s $destination/android-toolchain /opt/android-toolchain
-echo "add something like the following to your environment:\n\
-export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake\n\
-then run cmake like:\n\
-\tcmake cmake -DCMAKE_TOOLCHAIN_FILE=\$ANDTOOLCHAIN .."
+echo "making soft links to the standalone toolchain with:
+ ln -fs $destination/android-toolchain /opt/android-toolchain"
+sudo ln -fs $destination/android-toolchain /opt/android-toolchain
+echo "##########################################################
+add something like the following to your environment:
+  export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake
+then run cmake like:
+  cmake -DCMAKE_TOOLCHAIN_FILE=\$ANDTOOLCHAIN .."
