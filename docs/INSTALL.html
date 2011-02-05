@@ -25,4 +25,20 @@ toolchain.
 
 Lets try the <a href="hello-cmake.html">hello-cmake</a> sample.
 
+<h3> Ubuntu Quick Start <h3>
+Lets assume you have ANDROID_CMAKE pointing to the android-cmake directory.
+#export a working directory, this will be where the script downloads the ndk to
+WORK=$HOME
+cd $ANDROID_CMAKE/scripts
+#this will pull down the ndk r5, and setup a NDK standalone toolchain
+./get_ndk_toolchain_linux.sh $WORK
+#add the toolchain location to your bashrc or otherwise export it to your env
+echo export ANDTOOLCHAIN=$ANDROID_CMAKE/toolchain/android.toolchain.cmake >> $HOME/.bashrc
+
+Now when you re-source your bashrc, you can run cmake with the toolchain:
+cd $MY_CMAKE_PROJECT
+mkdir build
+cd build
+cmake -DCMAKE_TOOLCHAIN_FILE=$ANDTOOLCHAIN ..
+
 </pre></body></html>
