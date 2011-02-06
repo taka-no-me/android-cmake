@@ -152,7 +152,7 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "c flags")
 #Also, this is *required* to use the following linker flags that routes around
 #a CPU bug in some Cortex-A8 implementations:
 SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++")
-#SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ ")
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ ")
 
 #set these global flags for cmake client scripts to change behavior
 set(ANDROID True)
