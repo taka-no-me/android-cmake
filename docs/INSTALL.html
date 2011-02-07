@@ -44,4 +44,15 @@ Now when you re-source your bashrc, you can run cmake with the toolchain:
   cd build
   cmake -DCMAKE_TOOLCHAIN_FILE=$ANDTOOLCHAIN ..
 
+<h3> alias trick </a>
+Add these lines to your bashrc:
+  export ANDTOOLCHAIN=$ANDROID_CMAKE/toolchain/android.toolchain.cmake
+  alias android-cmake='cmake -DCMAKE_TOOLCHAIN_FILE=$ANDTOOLCHAIN '
+
+Then to run cmake for android do:
+  cd $MY_CMAKE_PROJECT
+  mkdir build
+  cd build
+  android-cmake ..
+
 </pre></body></html>
