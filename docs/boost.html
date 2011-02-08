@@ -1,0 +1,35 @@
+<html><body><pre>boost for android
+<h3>
+Introduction
+-------------
+</h3>
+Let's build boost for android.  Assuming you are using the alias trick for android-cmake:
+  export ANDTOOLCHAIN=$ANDROID_CMAKE/toolchain/android.toolchain.cmake
+  alias android-cmake='cmake -DCMAKE_TOOLCHAIN_FILE=$ANDTOOLCHAIN '
+<h3>
+I. Build the native code
+----------------
+</h3>
+  cd common-libs/boost
+  
+Pull down and patch the boost libraries for android.
+ sh ./get_boost.sh
+ mkdir build
+ cd build
+ android-cmake ..
+ make
+
+To build with for targets other than armeabi-v7a, edit the cache. (cmake-gui,ccmake)
+<h3>  
+II. Use boost in your projects
+----------------
+</h3>
+See the hello-boost project under samples.
+
+find_package(Boost REQUIRED filesystem system)
+
+include_directories(${Boost_INCLUDE_DIRS})
+
+add_library(my_target SHARED ${my_target_srcs})
+target_link_libraries(my_target ${Boost_LIBRARIES})
+
