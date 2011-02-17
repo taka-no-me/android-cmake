@@ -153,9 +153,16 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "c flags")
 #-L${LIBCPP_LINK_DIR} -lstdc++ -lsupc++
 #Also, this is *required* to use the following linker flags that routes around
 #a CPU bug in some Cortex-A8 implementations:
-SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++" CACHE STRING "linker flags")
-SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ " CACHE STRING "linker flags")
 
+set(NO_UNDEFINED ON CACHE BOOL "Don't all undefined symbols" )
+if(NO_UNDEFINED)
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++" CACHE STRING "linker flags" FORCE)
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ " CACHE STRING "linker flags" FORCE)
+else()
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -lstdc++ -lsupc++" CACHE STRING "linker flags" FORCE)
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -lstdc++ -lsupc++ " CACHE STRING "linker flags" FORCE)
+endif()
+#-Wl,--no-undefined 
 #set these global flags for cmake client scripts to change behavior
 set(ANDROID True)
 set(BUILD_ANDROID True)
