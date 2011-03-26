@@ -1,0 +1,25 @@
+<html><body><pre>Hello GL2
+<h3>
+Introduction
+-------------
+</h3>
+This example is taken directly from the android ndk samples, except here it builds with
+cmake.
+<h3>  
+I. Build the native code
+----------------
+</h3>
+  cd hello-gl2
+  mkdir build
+  cd build
+  android-cmake ..
+  make
+<h3>  
+II. Build the Android App (command line way)
+----------------
+</h3>
+  cd hello-gl2
+  ./project_create.sh
+  ant compile
+  ant install
+

@@ -66,22 +66,24 @@ if(NOT EXISTS ${ANDROID_NDK_TOOLCHAIN_ROOT})
 endif()
 # specify the cross compiler
 SET(CMAKE_C_COMPILER   
-  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc CACHE PATH "compiler" )
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-gcc CACHE PATH "gcc" FORCE)
 SET(CMAKE_CXX_COMPILER 
-  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ CACHE PATH "compiler" )
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-g++ CACHE PATH "gcc" FORCE)
 #there may be a way to make cmake deduce these TODO deduce the rest of the tools
 set(CMAKE_AR
- ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ar  CACHE PATH "archive")
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ar  CACHE PATH "archive" FORCE)
 set(CMAKE_LINKER
- ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ld  CACHE PATH "linker")
- set(CMAKE_NM
- ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-nm  CACHE PATH "nm")
- set(CMAKE_OBJCOPY
- ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objcopy  CACHE PATH "objcopy")
-  set(CMAKE_OBJDUMP
- ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objdump  CACHE PATH "objdump")
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ld  CACHE PATH "linker" FORCE)
+set(CMAKE_NM
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-nm  CACHE PATH "nm" FORCE)
+set(CMAKE_OBJCOPY
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objcopy  CACHE PATH "objcopy" FORCE)
+set(CMAKE_OBJDUMP
+ ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-objdump  CACHE PATH "objdump" FORCE)
 set(CMAKE_STRIP
-  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-strip  CACHE PATH "strip")
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-strip  CACHE PATH "strip" FORCE)
+set(CMAKE_RANLIB
+  ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ranlib  CACHE PATH "ranlib" FORCE)
 #setup build targets, mutually exclusive
 set(PossibleArmTargets
   "armeabi;armeabi-v7a;armeabi-v7a with NEON")
@@ -151,9 +153,16 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "c flags")
 #-L${LIBCPP_LINK_DIR} -lstdc++ -lsupc++
 #Also, this is *required* to use the following linker flags that routes around
 #a CPU bug in some Cortex-A8 implementations:
-SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++")
-SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ ")
 
+set(NO_UNDEFINED ON CACHE BOOL "Don't all undefined symbols" )
+if(NO_UNDEFINED)
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++" CACHE STRING "linker flags" FORCE)
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -Wl,--no-undefined -lstdc++ -lsupc++ " CACHE STRING "linker flags" FORCE)
+else()
+SET(CMAKE_SHARED_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -lstdc++ -lsupc++" CACHE STRING "linker flags" FORCE)
+SET(CMAKE_MODULE_LINKER_FLAGS "-Wl,--fix-cortex-a8 -L${CMAKE_INSTALL_PREFIX}/lib -lstdc++ -lsupc++ " CACHE STRING "linker flags" FORCE)
+endif()
+#-Wl,--no-undefined 
 #set these global flags for cmake client scripts to change behavior
 set(ANDROID True)
 set(BUILD_ANDROID True)
