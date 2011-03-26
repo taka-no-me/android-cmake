@@ -37,5 +37,8 @@ sudo ln -fs $destination/android-toolchain /opt/android-toolchain
 echo "##########################################################
 add something like the following to your environment:
   export ANDTOOLCHAIN=~/android-cmake/toolchain/android.toolchain.cmake
+  #the following is a nice alias
+  alias android-cmake='cmake -DCMAKE_TOOLCHAIN_FILE=\$ANDTOOLCHAIN '
 then run cmake like:
   cmake -DCMAKE_TOOLCHAIN_FILE=\$ANDTOOLCHAIN .."
+  
