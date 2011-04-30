@@ -81,6 +81,10 @@
 #     [+] added toolchain option to disable SWIG search
 #     [+] added platform "armeabi-v7a with VFPV3"
 #     [~] ARM_TARGETS renamed to ARM_TARGET
+#   - modified April 2011 Andrey Kamaev andrey.kamaev@itseez.com
+#     [+] EXECUTABLE_OUTPUT_PATH is set by toolchain (required on Windows)
+#     [~] Fixed bug with ANDROID_LEVEL variable
+#     [~] turn off SWIG search if it is not found first time
 # ----------------------------------------------------------------------------
 
 # this one is important
@@ -122,13 +126,16 @@ if( EXISTS ${ANDROID_NDK} )
  set( ANDROID_LEVEL $ENV{ANDROID_LEVEL} )
  string( REGEX REPLACE "android-([0-9]+)" "\\1" ANDROID_LEVEL "${ANDROID_LEVEL}" )
 
+ set( PossibleAndroidLevels "3;4;5;8;9" )
+ set( ANDROID_LEVEL ${ANDROID_LEVEL} CACHE STRING "android API level" )
+ set_property( CACHE ANDROID_LEVEL PROPERTY STRINGS ${PossibleAndroidLevels} )
+ 
  if( NOT ANDROID_LEVEL GREATER 2 )
-  set( ANDROID_LEVEL 8 )
+  set( ANDROID_LEVEL 8 CACHE STRING "android API level" FORCE )
   message( STATUS "Using default android API level android-${ANDROID_LEVEL}" )
   message( STATUS "If you prefer to use a different API level, please define the environment variable: ANDROID_LEVEL" )
  endif()
 
- set( ANDROID_LEVEL ${ANDROID_LEVEL} CACHE PATH "android API level" FORCE )
  set( ANDROID_NDK_TOOLCHAIN_ROOT "${ANDROID_NDK}/toolchains/arm-linux-androideabi-4.4.3/prebuilt/${NDKSYSTEM}" )
  set( ANDROID_NDK_SYSROOT "${ANDROID_NDK}/platforms/android-${ANDROID_LEVEL}/arch-arm/" )
 
@@ -175,8 +182,6 @@ set( CMAKE_OBJDUMP      ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-
 set( CMAKE_STRIP        ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-strip${TOOL_OS_SUFFIX}   CACHE PATH "strip" FORCE )
 set( CMAKE_RANLIB       ${ANDROID_NDK_TOOLCHAIN_ROOT}/bin/arm-linux-androideabi-ranlib${TOOL_OS_SUFFIX}  CACHE PATH "ranlib" FORCE )
 
-set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH "root for library output, set this to change where android libs are installed to" )
-
 #setup build targets, mutually exclusive
 set( PossibleArmTargets "armeabi;armeabi-v7a;armeabi-v7a with NEON;armeabi-v7a with VFPV3" )
 set( ARM_TARGET "armeabi-v7a" CACHE STRING "the arm target for android, recommend armeabi-v7a for floating point support and NEON." )
@@ -203,7 +208,10 @@ else()
  set( ARMEABI_NDK_NAME "armeabi-v7a" )
 endif()
 
+#setup output directories
+set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH "root for library output, set this to change where android libs are installed to" )
 set( LIBRARY_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ARMEABI_NDK_NAME} CACHE PATH "path for android libs" FORCE )
+set( EXECUTABLE_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH_ROOT}/bin/${ARMEABI_NDK_NAME} CACHE PATH "Output directory for applications" FORCE)
 set( CMAKE_INSTALL_PREFIX ${ANDROID_NDK_TOOLCHAIN_ROOT}/user/${ARMEABI_NDK_NAME} CACHE STRING "path for installing" FORCE )
 
 # where is the target environment 
@@ -287,17 +295,22 @@ if( NOT NO_SWIG )
  #need to search in the  host for swig to be found
  set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH )
  set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH )
- find_package( SWIG )
- set( SWIG_USE_FILE ${CMAKE_ROOT}/Modules/UseSWIG.cmake CACHE PATH "Use Swig cmake module" )
+ find_package( SWIG QUIET )
  set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
  set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY )
 
- set( SWIG_OUTPUT_ROOT ${LIBRARY_OUTPUT_PATH_ROOT}/src CACHE PATH "Where swig generated files will be placed relative to, <SWIG_OUTPUT_ROOT>/com/mylib/foo/jni ..." FORCE )
+ if( SWIG_FOUND )
+  set( SWIG_USE_FILE ${CMAKE_ROOT}/Modules/UseSWIG.cmake CACHE PATH "Use Swig cmake module" )
+  set( SWIG_OUTPUT_ROOT ${LIBRARY_OUTPUT_PATH_ROOT}/src CACHE PATH "Where swig generated files will be placed relative to, <SWIG_OUTPUT_ROOT>/com/mylib/foo/jni ..." FORCE )
 
- #convenience macro for swig java packages
- macro( SET_SWIG_JAVA_PACKAGE package_name )
-  string( REGEX REPLACE "[.]" "/" package_name_output ${package_name} )
-  set( CMAKE_SWIG_OUTDIR ${SWIG_OUTPUT_ROOT}/${package_name_output} )
-  set( CMAKE_SWIG_FLAGS "-package" "'${package_name}'" )
- endmacro()
+  #convenience macro for swig java packages
+  macro( SET_SWIG_JAVA_PACKAGE package_name )
+   string( REGEX REPLACE "[.]" "/" package_name_output ${package_name} )
+   set( CMAKE_SWIG_OUTDIR ${SWIG_OUTPUT_ROOT}/${package_name_output} )
+   set( CMAKE_SWIG_FLAGS "-package" "'${package_name}'" )
+  endmacro()
+ else()
+  message( STATUS "SWIG is not found" )
+  set( NO_SWIG ON CACHE BOOL "Don't search for SWIG" FORCE )
+ endif()
 endif()
