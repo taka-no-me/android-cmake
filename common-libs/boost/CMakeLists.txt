@@ -49,11 +49,14 @@ file(GLOB lib_srcs ${boost_root}/libs/thread/src/pthread/*.cpp)
 
 add_library( boost_thread ${lib_srcs})
 
+file(GLOB lib_srcs ${boost_root}/libs/date_time/src/gregorian/*.cpp ${boost_root}/libs/date_time/src/posix_time/*.cpp)
+
+add_library( boost_date_time ${lib_srcs})
 
 #target_link_libraries(boost_filesystem boost_system)
 
 set(Boost_INCLUDE_DIRS ${boost_root})
-set(Boost_LIBRARIES boost_filesystem boost_system boost_program_options boost_iostreams )
+set(Boost_LIBRARIES boost_filesystem boost_system boost_program_options boost_iostreams boost_date_time)
 set(Boost_LINK_DIRS ${LIBRARY_OUTPUT_PATH})
 
 configure_file(${CMAKE_SOURCE_DIR}/BoostConfig.cmake.in
@@ -67,4 +70,5 @@ install(TARGETS boost_iostreams DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(TARGETS boost_regex DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(TARGETS boost_signals DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(TARGETS boost_thread DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS boost_date_time DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 
