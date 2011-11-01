@@ -17,5 +17,5 @@ tar -xf boost_1_45_0.tar.gz
 mv boost_1_45_0 $current_dir
 
 cd $current_dir
-echo ./patch.filesystem.sh boost_1_45_0
-./patch.filesystem.sh boost_1_45_0
+echo ./patch_boost.sh boost_1_45_0
+./patch_boost.sh boost_1_45_0

@@ -1,0 +1,5 @@
+67c67,68
+<    || defined(_M_X64) || defined(__bfin__)
+---
+>    || defined(_M_X64) || defined(__bfin__) \
+>    || defined(__ANDROID__)
