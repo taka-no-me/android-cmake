@@ -237,6 +237,8 @@
 #     [~] compiler options are aligned with NDK r8b
 #   - modified October 2012
 #     [~] fixed C++ linking: explicitly link with math library (OpenCV #2426)
+#   - modified November 2012
+#     [+] updated for NDK r8c
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -259,7 +261,7 @@ set( CMAKE_SYSTEM_VERSION 1 )
 # rpath makes low sence for Android
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if(NOT DEFINED ANDROID_NDK_SEARCH_PATHS)
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
@@ -522,6 +524,8 @@ if( BUILD_WITH_ANDROID_NDK )
  string( REPLACE "android-" "" ANDROID_SUPPORTED_NATIVE_API_LEVELS "${ANDROID_SUPPORTED_NATIVE_API_LEVELS}" )
  file( GLOB __availableToolchains RELATIVE "${ANDROID_NDK}/toolchains" "${ANDROID_NDK}/toolchains/*" )
  __LIST_FILTER( __availableToolchains "^[.]" )
+ __LIST_FILTER( __availableToolchains "-clang3.1$" )
+ __LIST_FILTER( __availableToolchains "llvm-3.1$" )
  set( __availableToolchainMachines "" )
  set( __availableToolchainArchs "" )
  set( __availableToolchainCompilerVersions "" )
@@ -991,6 +995,7 @@ set( CMAKE_CXX_PLATFORM_ID Linux )
 set( CMAKE_CXX_SIZEOF_DATA_PTR 4 )
 set( CMAKE_CXX_HAS_ISYSROOT 1 )
 set( CMAKE_CXX_COMPILER_ABI ELF )
+set( CMAKE_CXX_SOURCE_FILE_EXTENSIONS cc cp cxx cpp CPP c++ C )
 # force ASM compiler (required for CMake < 2.8.5)
 set( CMAKE_ASM_COMPILER_ID_RUN TRUE )
 set( CMAKE_ASM_COMPILER_ID GNU )
@@ -1056,10 +1061,10 @@ if( ARMEABI_V7A )
  elseif( VFPV3 )
   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=vfpv3" )
  else()
-  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=vfp" )
+  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=vfpv3-d16" )
  endif()
 elseif( ARMEABI_V6 )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv6 -mfloat-abi=softfp -mfpu=vfp" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv6 -mfloat-abi=softfp -mfpu=vfp" ) # vfp == vfpv2
 elseif( ARMEABI )
  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv5te -mtune=xscale -msoft-float" )
 endif()
@@ -1148,14 +1153,18 @@ if( ANDROID_FUNCTION_LEVEL_LINKING )
  set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -Wl,--gc-sections" )
 endif()
 
-if( ANDROID_GOLD_LINKER AND CMAKE_HOST_UNIX AND (ARMEABI OR ARMEABI_V7A OR X86) AND ANDROID_COMPILER_VERSION VERSION_EQUAL "4.6" )
- set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -fuse-ld=gold" )
-elseif( ANDROID_NDK_RELEASE STREQUAL "r8b" AND ARMEABI AND ANDROID_COMPILER_VERSION VERSION_EQUAL "4.6" AND NOT _CMAKE_IN_TRY_COMPILE )
- message( WARNING "The default bfd linker from arm GCC 4.6 toolchain can fail with 'unresolvable R_ARM_THM_CALL relocation' error message. See https://code.google.com/p/android/issues/detail?id=35342
+if( ANDROID_COMPILER_VERSION VERSION_EQUAL "4.6" )
+ if( ANDROID_GOLD_LINKER AND (CMAKE_HOST_UNIX OR ANDROID_NDK_RELEASE STRGREATER "r8b") AND (ARMEABI OR ARMEABI_V7A OR X86) )
+  set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -fuse-ld=gold" )
+ elseif( ANDROID_NDK_RELEASE STREQUAL "r8c")
+  set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -fuse-ld=bfd" )
+ elseif( ANDROID_NDK_RELEASE STREQUAL "r8b" AND ARMEABI AND NOT _CMAKE_IN_TRY_COMPILE )
+  message( WARNING "The default bfd linker from arm GCC 4.6 toolchain can fail with 'unresolvable R_ARM_THM_CALL relocation' error message. See https://code.google.com/p/android/issues/detail?id=35342
   On Linux and OS X host platform you can workaround this problem using gold linker (default).
-  Rerun cmake with -DANDROID_GOLD_LINKER=ON option.
+  Rerun cmake with -DANDROID_GOLD_LINKER=ON option in case of problems.
 " )
-endif()
+ endif()
+endif() # version 4.6
 
 if( ANDROID_NOEXECSTACK )
  set( ANDROID_CXX_FLAGS    "${ANDROID_CXX_FLAGS} -Wa,--noexecstack" )
@@ -1375,7 +1384,7 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86" or "mips" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b; set only for NDK
+#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b, r8c; set only for NDK
 #   ANDROID_ARCH_NAME : "arm" or "x86" or "mips" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
