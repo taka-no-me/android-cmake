@@ -88,25 +88,32 @@
 #        none           -> Do not configure the runtime.
 #        system         -> Use the default minimal system C++ runtime library.
 #                          Implies -fno-rtti -fno-exceptions.
+#                          Is not available for standalone toolchain.
 #        system_re      -> Use the default minimal system C++ runtime library.
 #                          Implies -frtti -fexceptions.
+#                          Is not available for standalone toolchain.
 #        gabi++_static  -> Use the GAbi++ runtime as a static library.
 #                          Implies -frtti -fno-exceptions.
 #                          Available for NDK r7 and newer.
+#                          Is not available for standalone toolchain.
 #        gabi++_shared  -> Use the GAbi++ runtime as a shared library.
 #                          Implies -frtti -fno-exceptions.
 #                          Available for NDK r7 and newer.
+#                          Is not available for standalone toolchain.
 #        stlport_static -> Use the STLport runtime as a static library.
 #                          Implies -fno-rtti -fno-exceptions for NDK before r7.
 #                          Implies -frtti -fno-exceptions for NDK r7 and newer.
+#                          Is not available for standalone toolchain.
 #        stlport_shared -> Use the STLport runtime as a shared library.
 #                          Implies -fno-rtti -fno-exceptions for NDK before r7.
 #                          Implies -frtti -fno-exceptions for NDK r7 and newer.
+#                          Is not available for standalone toolchain.
 #        gnustl_static  -> Use the GNU STL as a static library.
 #                          Implies -frtti -fexceptions.
 #        gnustl_shared  -> Use the GNU STL as a shared library.
 #                          Implies -frtti -fno-exceptions.
 #                          Available for NDK r7b and newer.
+#                          Silently degrades to gnustl_static if not available.
 #
 #    ANDROID_STL_FORCE_FEATURES=ON - turn rtti and exceptions support based on
 #      chosen runtime. If disabled, then the user is responsible for settings
@@ -222,6 +229,8 @@
 #     [~] fixed mips linker flags for NDK r8b
 #   - modified September 2012
 #     [+] added NDK release name detection (see ANDROID_NDK_RELEASE)
+#     [+] added support for all C++ runtimes from NDK
+#         (system, gabi++, stlport, gnustl)
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -494,7 +503,7 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
  else()
   execute_process( COMMAND "${ANDROID_STANDALONE_TOOLCHAIN}/bin/${__availableToolchainMachines}-gcc${TOOL_OS_SUFFIX}" --version
    OUTPUT_VARIABLE __availableToolchainCompilerVersions OUTPUT_STRIP_TRAILING_WHITESPACE )
-  string( REGEX MATCH "[0-9]+.[0-9]+.[0-9]+" __availableToolchainCompilerVersions "${__availableToolchainCompilerVersions}" )
+  string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9]+)?" __availableToolchainCompilerVersions "${__availableToolchainCompilerVersions}" )
  endif()
 endif()
 
@@ -510,7 +519,7 @@ if( BUILD_WITH_ANDROID_NDK )
  foreach( __toolchain ${__availableToolchains} )
   __DETECT_TOOLCHAIN_MACHINE_NAME( __machine "${ANDROID_NDK}/toolchains/${__toolchain}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
   if( __machine )
-   string( REGEX MATCH "[0-9]+[.][0-9]+[.]*[0-9]*$" __version "${__toolchain}" )
+   string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9]+)?$" __version "${__toolchain}" )
    string( REGEX MATCH "^[^-]+" __arch "${__toolchain}" )
    list( APPEND __availableToolchainMachines "${__machine}" )
    list( APPEND __availableToolchainArchs "${__arch}" )
@@ -708,6 +717,7 @@ endif()
 
 # runtime choice (STL, rtti, exceptions)
 if( NOT ANDROID_STL )
+ # honor legacy ANDROID_USE_STLPORT
  if( DEFINED ANDROID_USE_STLPORT )
   if( ANDROID_USE_STLPORT )
    set( ANDROID_STL stlport_static )
@@ -722,8 +732,9 @@ set( ANDROID_STL "${ANDROID_STL}" CACHE STRING "C++ runtime" )
 set( ANDROID_STL_FORCE_FEATURES ON CACHE BOOL "automatically configure rtti and exceptions support based on C++ runtime" )
 mark_as_advanced( ANDROID_STL ANDROID_STL_FORCE_FEATURES )
 
-if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared)$")
- message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
+if( BUILD_WITH_ANDROID_NDK )
+ if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared)$")
+  message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
 The possible values are:
   none           -> Do not configure the runtime.
   system         -> Use the default minimal system C++ runtime library.
@@ -734,7 +745,17 @@ The possible values are:
   stlport_shared -> Use the STLport runtime as a shared library.
   gnustl_static  -> (default) Use the GNU STL as a static library.
   gnustl_shared  -> Use the GNU STL as a shared library.
-  " )
+" )
+ endif()
+elseif( BUILD_WITH_STANDALONE_TOOLCHAIN )
+ if( NOT "${ANDROID_STL}" MATCHES "^(none|gnustl_static|gnustl_shared)$")
+  message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
+The possible values are:
+  none           -> Do not configure the runtime.
+  gnustl_static  -> (default) Use the GNU STL as a static library.
+  gnustl_shared  -> Use the GNU STL as a shared library.
+" )
+ endif()
 endif()
 
 unset( ANDROID_RTTI )
@@ -792,9 +813,8 @@ if( BUILD_WITH_ANDROID_NDK )
  else()
   message( FATAL_ERROR "Unknown runtime: ${ANDROID_STL}" )
  endif()
-
+ # find libsupc++.a - rtti & exceptions
  if( ANDROID_STL STREQUAL "system_re" OR ANDROID_STL MATCHES "gnustl" )
-  # find libsupc++.a
   if( ANDROID_NDK_RELEASE STRGREATER "r8" ) # r8b
    set( __libsupcxx "${ANDROID_NDK}/sources/cxx-stl/gnu-libstdc++/${ANDROID_COMPILER_VERSION}/libs/${ANDROID_NDK_ABI_NAME}/libsupc++.a" )
   elseif( NOT ANDROID_NDK_RELEASE STRLESS "r7" AND ANDROID_NDK_RELEASE STRLESS "r8b")
@@ -822,20 +842,57 @@ endif()
 if( BUILD_WITH_STANDALONE_TOOLCHAIN )
  set( ANDROID_TOOLCHAIN_ROOT "${ANDROID_STANDALONE_TOOLCHAIN}" )
  set( ANDROID_SYSROOT "${ANDROID_STANDALONE_TOOLCHAIN}/sysroot" )
- #set( __stlLibPath "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib" )
- #TODO: configure stl
+
+ if( NOT ANDROID_STL STREQUAL "none" )
+  set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/include/c++/${ANDROID_COMPILER_VERSION}" )
+  if( ARMEABI_V7A AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}/bits" )
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}" )
+  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb/bits" )
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb" )
+  else()
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" )
+  endif()
+  # always search static GNU STL to get the location of libsupc++.a
+  if( ARMEABI_V7A AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb" )
+  elseif( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}" )
+  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb" )
+  elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib" )
+  endif()
+  if( __libstl )
+   set( __libsupcxx "${__libstl}/libsupc++.a" )
+   set( __libstl    "${__libstl}/libstdc++.a" )
+  endif()
+  if( NOT EXISTS "${__libsupcxx}" )
+   message( FATAL_ERROR "TODO: missing stdsupc++ in NDK r7 error" )
+  endif()
+  if( ANDROID_STL STREQUAL "gnustl_shared" )
+   if( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
+   elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
+   elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
+   endif()
+  endif()
+ endif()
 endif()
 
-
+# case of shared STL linkage
 if( ANDROID_STL MATCHES "shared" AND DEFINED __libstl )
  string( REPLACE "_static.a" "_shared.so" __libstl "${__libstl}" )
- get_filename_component( __libstlname "${__libstl}" NAME )
- execute_process( COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${__libstl}" "${LIBRARY_OUTPUT_PATH}/${__libstlname}" RESULT_VARIABLE __fileCopyProcess )
- if( NOT __fileCopyProcess EQUAL 0 OR NOT EXISTS "${LIBRARY_OUTPUT_PATH}/${__libstlname}")
-  message( SEND_ERROR "Failed copying of ${__libstl} to the ${LIBRARY_OUTPUT_PATH}/${__libstlname}" )
+ if( NOT _CMAKE_IN_TRY_COMPILE AND __libstl MATCHES "[.]so$" )
+  get_filename_component( __libstlname "${__libstl}" NAME )
+  execute_process( COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${__libstl}" "${LIBRARY_OUTPUT_PATH}/${__libstlname}" RESULT_VARIABLE __fileCopyProcess )
+  if( NOT __fileCopyProcess EQUAL 0 OR NOT EXISTS "${LIBRARY_OUTPUT_PATH}/${__libstlname}")
+   message( SEND_ERROR "Failed copying of ${__libstl} to the ${LIBRARY_OUTPUT_PATH}/${__libstlname}" )
+  endif()
+  unset( __fileCopyProcess )
+  unset( __libstlname )
  endif()
- unset( __fileCopyProcess )
- unset( __libstlname )
 endif()
 
 # ccache support
@@ -857,7 +914,7 @@ else()
  set( CMAKE_C_COMPILER   "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}"    CACHE PATH "gcc" )
  set( CMAKE_CXX_COMPILER "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-g++${TOOL_OS_SUFFIX}"    CACHE PATH "g++" )
 endif()
-set( CMAKE_ASM_COMPILER "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}"     CACHE PATH "Assembler" )
+set( CMAKE_ASM_COMPILER "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}"     CACHE PATH "assembler" )
 if( CMAKE_VERSION VERSION_LESS 2.8.5 )
  set( CMAKE_ASM_COMPILER_ARG1 "-c" )
 endif()
@@ -879,6 +936,9 @@ if( APPLE )
 endif()
 
 # flags and definitions
+remove_definitions( -DANDROID )
+add_definitions( -DANDROID )
+
 if(ANDROID_SYSROOT MATCHES "[ ;\"]")
  set( ANDROID_CXX_FLAGS "--sysroot=\"${ANDROID_SYSROOT}\"" )
  if( NOT _CMAKE_IN_TRY_COMPILE )
@@ -888,9 +948,6 @@ if(ANDROID_SYSROOT MATCHES "[ ;\"]")
 else()
  set( ANDROID_CXX_FLAGS "--sysroot=${ANDROID_SYSROOT}" )
 endif()
-
-remove_definitions( -DANDROID )
-add_definitions( -DANDROID )
 
 # Force set compilers because standard identification works badly for us
 include( CMakeForceCompiler )
@@ -986,26 +1043,27 @@ elseif( X86 )
 endif()
 
 # STL
-if( EXISTS "${__libstl}" OR EXISTS "${__libsupcxx}" )
- set( CMAKE_CXX_CREATE_SHARED_LIBRARY "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
- set( CMAKE_CXX_CREATE_SHARED_MODULE  "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
- set( CMAKE_CXX_LINK_EXECUTABLE "<CMAKE_CXX_COMPILER>  <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>" )
+if( 0 AND EXISTS "${__libstl}" OR EXISTS "${__libsupcxx}" )
+ # use gcc as a C++ linker to avoid automatic picking of libsdtc++
+ set( CMAKE_CXX_CREATE_SHARED_LIBRARY "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+ set( CMAKE_CXX_CREATE_SHARED_MODULE  "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+ set( CMAKE_CXX_LINK_EXECUTABLE       "<CMAKE_C_COMPILER> <FLAGS> <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" )
  if( EXISTS "${__libstl}" )
   set( CMAKE_CXX_CREATE_SHARED_LIBRARY "${CMAKE_CXX_CREATE_SHARED_LIBRARY} \"${__libstl}\"")
   set( CMAKE_CXX_CREATE_SHARED_MODULE  "${CMAKE_CXX_CREATE_SHARED_MODULE} \"${__libstl}\"")
-  set( CMAKE_CXX_LINK_EXECUTABLE  "${CMAKE_CXX_LINK_EXECUTABLE} \"${__libstl}\"")
+  set( CMAKE_CXX_LINK_EXECUTABLE       "${CMAKE_CXX_LINK_EXECUTABLE} \"${__libstl}\"")
  endif()
  if( EXISTS "${__libsupcxx}" )
   set( CMAKE_CXX_CREATE_SHARED_LIBRARY "${CMAKE_CXX_CREATE_SHARED_LIBRARY} \"${__libsupcxx}\"")
   set( CMAKE_CXX_CREATE_SHARED_MODULE  "${CMAKE_CXX_CREATE_SHARED_MODULE} \"${__libsupcxx}\"")
-  set( CMAKE_CXX_LINK_EXECUTABLE  "${CMAKE_CXX_LINK_EXECUTABLE} \"${__libsupcxx}\"")
+  set( CMAKE_CXX_LINK_EXECUTABLE       "${CMAKE_CXX_LINK_EXECUTABLE} \"${__libsupcxx}\"")
   # C objects:
-  set( CMAKE_C_CREATE_SHARED_LIBRARY = "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_C_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>" )
-  set( CMAKE_C_CREATE_SHARED_MODULE = "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_C_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>" )
-  set( CMAKE_C_LINK_EXECUTABLE = "<CMAKE_C_COMPILER> <FLAGS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>" )
+  set( CMAKE_C_CREATE_SHARED_LIBRARY "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_C_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS> <CMAKE_SHARED_LIBRARY_SONAME_C_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>" )
+  set( CMAKE_C_CREATE_SHARED_MODULE  "<CMAKE_C_COMPILER> <CMAKE_SHARED_LIBRARY_C_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS> <CMAKE_SHARED_LIBRARY_SONAME_C_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>" )
+  set( CMAKE_C_LINK_EXECUTABLE       "<CMAKE_C_COMPILER> <FLAGS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" )
   set( CMAKE_C_CREATE_SHARED_LIBRARY "${CMAKE_C_CREATE_SHARED_LIBRARY} \"${__libsupcxx}\"")
   set( CMAKE_C_CREATE_SHARED_MODULE  "${CMAKE_C_CREATE_SHARED_MODULE} \"${__libsupcxx}\"")
-  set( CMAKE_C_LINK_EXECUTABLE  "${CMAKE_C_LINK_EXECUTABLE} \"${__libsupcxx}\"")
+  set( CMAKE_C_LINK_EXECUTABLE       "${CMAKE_C_LINK_EXECUTABLE} \"${__libsupcxx}\"")
  endif()
 endif()
 
@@ -1067,9 +1125,6 @@ set( CMAKE_SHARED_LINKER_FLAGS "" CACHE STRING "linker flags" )
 set( CMAKE_MODULE_LINKER_FLAGS "" CACHE STRING "linker flags" )
 set( CMAKE_EXE_LINKER_FLAGS "-Wl,-z,nocopyreloc" CACHE STRING "linker flags" )
 
-include_directories( SYSTEM "${ANDROID_SYSROOT}/usr/include" ${ANDROID_STL_INCLUDE_DIRS} )
-link_directories( "${CMAKE_INSTALL_PREFIX}/libs/${ANDROID_NDK_ABI_NAME}" )
-
 # finish flags
 set( ANDROID_CXX_FLAGS    "${ANDROID_CXX_FLAGS}"    CACHE INTERNAL "Extra Android compiler flags" )
 set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS}" CACHE INTERNAL "Extra Android linker flags" )
@@ -1104,6 +1159,13 @@ if( DEFINED ANDROID_EXCEPTIONS AND ANDROID_STL_FORCE_FEATURES )
   set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-exceptions" )
  endif()
 endif()
+
+# global includes and link directories
+if( ANDROID_STL_INCLUDE_DIRS )
+ include_directories( SYSTEM ${ANDROID_STL_INCLUDE_DIRS} )
+endif()
+link_directories( "${CMAKE_INSTALL_PREFIX}/libs/${ANDROID_NDK_ABI_NAME}" )
+
 
 # set these global flags for cmake client scripts to change behavior
 set( ANDROID True )
