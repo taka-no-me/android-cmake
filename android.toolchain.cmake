@@ -1,7 +1,37 @@
+# Copyright (c) 2010-2011, Ethan Rublee
+# Copyright (c) 2011-2012, Andrey Kamaev
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1.  Redistributions of source code must retain the above copyright notice,
+#     this list of conditions and the following disclaimer.
+#
+# 2.  Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+# 3.  The name of the copyright holders may be used to endorse or promote
+#     products derived from this software without specific prior written
+#     permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 # ------------------------------------------------------------------------------
 #  Android CMake toolchain file, for use with the Android NDK r5-r8
 #  Requires cmake 2.6.3 or newer (2.8.5 or newer is recommended).
-#  See home page: http://code.google.com/p/android-cmake/
+#  See home page: https://github.com/taka-no-me/android-cmake
 #
 #  The file is mantained by the OpenCV project. The latest version can be get at
 #  http://code.opencv.org/projects/opencv/repository/revisions/master/changes/android/android.toolchain.cmake
@@ -146,10 +176,6 @@
 #    Default is ${CMAKE_SOURCE_DIR}, and the android libs will always be
 #    under the ${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ANDROID_NDK_ABI_NAME}
 #    (depending on the target ABI). This is convenient for Android packaging.
-#
-#  Authors:
-#    Ethan Rublee ethan.ruble@gmail.com
-#    Andrey Kamaev andrey.kamaev@itseez.com
 #
 #  Change Log:
 #   - initial version December 2010
