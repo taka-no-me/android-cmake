@@ -552,6 +552,12 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
  execute_process( COMMAND "${ANDROID_STANDALONE_TOOLCHAIN}/bin/${__availableToolchainMachines}-gcc${TOOL_OS_SUFFIX}" -dumpversion
                   OUTPUT_VARIABLE __availableToolchainCompilerVersions OUTPUT_STRIP_TRAILING_WHITESPACE )
  string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9]+)?" __availableToolchainCompilerVersions "${__availableToolchainCompilerVersions}" )
+ if( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/bin/clang${TOOL_OS_SUFFIX}" )
+  list( APPEND __availableToolchains "standalone-clang" )
+  list( APPEND __availableToolchainMachines ${__availableToolchainMachines} )
+  list( APPEND __availableToolchainArchs ${__availableToolchainArchs} )
+  list( APPEND __availableToolchainCompilerVersions ${__availableToolchainCompilerVersions} )
+ endif()
 endif()
 
 macro( __GLOB_NDK_TOOLCHAINS __availableToolchainsVar )
@@ -739,19 +745,6 @@ list( GET __availableToolchains ${__toolchainIdx} ANDROID_TOOLCHAIN_NAME )
 list( GET __availableToolchainMachines ${__toolchainIdx} ANDROID_TOOLCHAIN_MACHINE_NAME )
 list( GET __availableToolchainCompilerVersions ${__toolchainIdx} ANDROID_COMPILER_VERSION )
 
-if( "${ANDROID_TOOLCHAIN_NAME}" MATCHES "-clang3[.][0-9]$" )
-  string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_NAME}")
- string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-4.6" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
- if( NOT EXISTS "${ANDROID_NDK}/toolchains/llvm-${ANDROID_CLANG_VERSION}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}/bin/clang${TOOL_OS_SUFFIX}" )
-  message( FATAL_ERROR "Could not find the " )
- endif()
- set( ANDROID_COMPILER_IS_CLANG 1 )
- set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK}/toolchains/llvm-${ANDROID_CLANG_VERSION}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
-else()
- set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
- unset( ANDROID_COMPILER_IS_CLANG CACHE )
-endif()
-
 unset( __toolchainIdx )
 unset( __availableToolchains )
 unset( __availableToolchainMachines )
@@ -790,19 +783,6 @@ if( CMAKE_VERSION VERSION_GREATER "2.8" )
  set_property( CACHE ANDROID_ABI PROPERTY STRINGS ${ANDROID_SUPPORTED_ABIS_${ANDROID_ARCH_FULLNAME}} )
 endif()
 
-
-# setup output directories
-set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH "root for library output, set this to change where android libs are installed to" )
-set( CMAKE_INSTALL_PREFIX "${ANDROID_TOOLCHAIN_ROOT}/user" CACHE STRING "path for installing" )
-
-if(NOT _CMAKE_IN_TRY_COMPILE)
- if( EXISTS "${CMAKE_SOURCE_DIR}/jni/CMakeLists.txt" )
-  set( EXECUTABLE_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/bin/${ANDROID_NDK_ABI_NAME}" CACHE PATH "Output directory for applications" )
- else()
-  set( EXECUTABLE_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/bin" CACHE PATH "Output directory for applications" )
- endif()
- set( LIBRARY_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ANDROID_NDK_ABI_NAME}" CACHE PATH "path for android libs" )
-endif()
 
 # runtime choice (STL, rtti, exceptions)
 if( NOT ANDROID_STL )
@@ -880,6 +860,81 @@ See https://android.googlesource.com/platform/development.git f907f4f9d4e56ccc80
 " )
 endif()
 
+
+# setup paths and STL for standalone toolchain
+if( BUILD_WITH_STANDALONE_TOOLCHAIN )
+ set( ANDROID_TOOLCHAIN_ROOT "${ANDROID_STANDALONE_TOOLCHAIN}" )
+ set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_STANDALONE_TOOLCHAIN}" )
+ set( ANDROID_SYSROOT "${ANDROID_STANDALONE_TOOLCHAIN}/sysroot" )
+
+ if( NOT ANDROID_STL STREQUAL "none" )
+  set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/include/c++/${ANDROID_COMPILER_VERSION}" )
+  if( ARMEABI_V7A AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}/bits" )
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}" )
+  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb/bits" )
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb" )
+  else()
+   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" )
+  endif()
+  # always search static GNU STL to get the location of libsupc++.a
+  if( ARMEABI_V7A AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb" )
+  elseif( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}" )
+  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb" )
+  elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libstdc++.a" )
+   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib" )
+  endif()
+  if( __libstl )
+   set( __libsupcxx "${__libstl}/libsupc++.a" )
+   set( __libstl    "${__libstl}/libstdc++.a" )
+  endif()
+  if( NOT EXISTS "${__libsupcxx}" )
+   message( FATAL_ERROR "The required libstdsupc++.a is missing in your standalone toolchain.
+ Usually it happens because of bug in make-standalone-toolchain.sh script from NDK r7, r7b and r7c.
+ You need to either upgrade to newer NDK or manually copy
+     $ANDROID_NDK/sources/cxx-stl/gnu-libstdc++/libs/${ANDROID_NDK_ABI_NAME}/libsupc++.a
+ to
+     ${__libsupcxx}
+   " )
+  endif()
+  if( ANDROID_STL STREQUAL "gnustl_shared" )
+   if( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
+   elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
+   elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
+    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
+   endif()
+  endif()
+ endif()
+endif()
+
+# clang
+if( "${ANDROID_TOOLCHAIN_NAME}" STREQUAL "standalone-clang" )
+ set( ANDROID_COMPILER_IS_CLANG 1 )
+ execute_process( COMMAND "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang${TOOL_OS_SUFFIX}" --version OUTPUT_VARIABLE ANDROID_CLANG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE )
+ string( REGEX MATCH "[0-9]+[.][0-9]+" ANDROID_CLANG_VERSION "${ANDROID_CLANG_VERSION}")
+elseif( "${ANDROID_TOOLCHAIN_NAME}" MATCHES "-clang3[.][0-9]?$" )
+ string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_NAME}")
+ string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-4.6" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+ if( NOT EXISTS "${ANDROID_NDK}/toolchains/llvm-${ANDROID_CLANG_VERSION}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}/bin/clang${TOOL_OS_SUFFIX}" )
+  message( FATAL_ERROR "Could not find the " )
+ endif()
+ set( ANDROID_COMPILER_IS_CLANG 1 )
+ set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK}/toolchains/llvm-${ANDROID_CLANG_VERSION}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
+else()
+ set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+ unset( ANDROID_COMPILER_IS_CLANG CACHE )
+endif()
+
+string( REPLACE "." "" _clang_name "clang${ANDROID_CLANG_VERSION}" )
+if( NOT EXISTS "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/${_clang_name}${TOOL_OS_SUFFIX}" )
+ set( _clang_name "clang" )
+endif()
+
+
 # setup paths and STL for NDK
 if( BUILD_WITH_ANDROID_NDK )
  set( ANDROID_TOOLCHAIN_ROOT "${ANDROID_NDK}/toolchains/${ANDROID_GCC_TOOLCHAIN_NAME}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
@@ -954,54 +1009,6 @@ if( BUILD_WITH_ANDROID_NDK )
  endif()
 endif()
 
-# setup paths and STL for standalone toolchain
-if( BUILD_WITH_STANDALONE_TOOLCHAIN )
- set( ANDROID_TOOLCHAIN_ROOT "${ANDROID_STANDALONE_TOOLCHAIN}" )
- set( ANDROID_SYSROOT "${ANDROID_STANDALONE_TOOLCHAIN}/sysroot" )
-
- if( NOT ANDROID_STL STREQUAL "none" )
-  set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/include/c++/${ANDROID_COMPILER_VERSION}" )
-  if( ARMEABI_V7A AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}/bits" )
-   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/${CMAKE_SYSTEM_PROCESSOR}" )
-  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb/bits" )
-   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/thumb" )
-  else()
-   list( APPEND ANDROID_STL_INCLUDE_DIRS "${ANDROID_STL_INCLUDE_DIRS}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" )
-  endif()
-  # always search static GNU STL to get the location of libsupc++.a
-  if( ARMEABI_V7A AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb/libstdc++.a" )
-   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/thumb" )
-  elseif( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libstdc++.a" )
-   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}" )
-  elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libstdc++.a" )
-   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb" )
-  elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libstdc++.a" )
-   set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib" )
-  endif()
-  if( __libstl )
-   set( __libsupcxx "${__libstl}/libsupc++.a" )
-   set( __libstl    "${__libstl}/libstdc++.a" )
-  endif()
-  if( NOT EXISTS "${__libsupcxx}" )
-   message( FATAL_ERROR "The required libstdsupc++.a is missing in your standalone toolchain.
- Usually it happens because of bug in make-standalone-toolchain.sh script from NDK r7, r7b and r7c.
- You need to either upgrade to newer NDK or manually copy
-     $ANDROID_NDK/sources/cxx-stl/gnu-libstdc++/libs/${ANDROID_NDK_ABI_NAME}/libsupc++.a
- to
-     ${__libsupcxx}
-   " )
-  endif()
-  if( ANDROID_STL STREQUAL "gnustl_shared" )
-   if( ARMEABI_V7A AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
-    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/${CMAKE_SYSTEM_PROCESSOR}/libgnustl_shared.so" )
-   elseif( ARMEABI AND NOT ANDROID_FORCE_ARM_BUILD AND EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
-    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/thumb/libgnustl_shared.so" )
-   elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
-    set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
-   endif()
-  endif()
- endif()
-endif()
 
 # case of shared STL linkage
 if( ANDROID_STL MATCHES "shared" AND DEFINED __libstl )
@@ -1017,6 +1024,7 @@ if( ANDROID_STL MATCHES "shared" AND DEFINED __libstl )
  endif()
 endif()
 
+
 # ccache support
 __INIT_VARIABLE( _ndk_ccache NDK_CCACHE ENV_NDK_CCACHE )
 if( _ndk_ccache )
@@ -1026,22 +1034,23 @@ else()
 endif()
 unset( _ndk_ccache )
 
+
 # setup the cross-compiler
 if( NOT CMAKE_C_COMPILER )
  if( NDK_CCACHE )
   set( CMAKE_C_COMPILER   "${NDK_CCACHE}" CACHE PATH "ccache as C compiler" )
   set( CMAKE_CXX_COMPILER "${NDK_CCACHE}" CACHE PATH "ccache as C++ compiler" )
   if( ANDROID_COMPILER_IS_CLANG )
-   set( CMAKE_C_COMPILER_ARG1   "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang${TOOL_OS_SUFFIX}"   CACHE PATH "C compiler")
-   set( CMAKE_CXX_COMPILER_ARG1 "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang++${TOOL_OS_SUFFIX}" CACHE PATH "C++ compiler")
+   set( CMAKE_C_COMPILER_ARG1   "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/${_clang_name}${TOOL_OS_SUFFIX}"   CACHE PATH "C compiler")
+   set( CMAKE_CXX_COMPILER_ARG1 "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/${_clang_name}++${TOOL_OS_SUFFIX}" CACHE PATH "C++ compiler")
   else()
    set( CMAKE_C_COMPILER_ARG1   "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}" CACHE PATH "C compiler")
    set( CMAKE_CXX_COMPILER_ARG1 "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-g++${TOOL_OS_SUFFIX}" CACHE PATH "C++ compiler")
   endif()
  else()
   if( ANDROID_COMPILER_IS_CLANG )
-   set( CMAKE_C_COMPILER   "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang${TOOL_OS_SUFFIX}"   CACHE PATH "C compiler")
-   set( CMAKE_CXX_COMPILER "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang++${TOOL_OS_SUFFIX}" CACHE PATH "C++ compiler")
+   set( CMAKE_C_COMPILER   "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/${_clang_name}${TOOL_OS_SUFFIX}"   CACHE PATH "C compiler")
+   set( CMAKE_CXX_COMPILER "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/${_clang_name}++${TOOL_OS_SUFFIX}" CACHE PATH "C++ compiler")
   else()
    set( CMAKE_C_COMPILER   "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}"    CACHE PATH "C compiler" )
    set( CMAKE_CXX_COMPILER "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-g++${TOOL_OS_SUFFIX}"    CACHE PATH "C++ compiler" )
@@ -1272,10 +1281,14 @@ if( ANDROID_RELRO )
 endif()
 
 if( ANDROID_COMPILER_IS_CLANG )
- if(ANDROID_ARCH_NAME STREQUAL "arm" )
-  set( ANDROID_CXX_FLAGS "-isystem ${ANDROID_CLANG_TOOLCHAIN_ROOT}/lib/clang/${ANDROID_CLANG_VERSION}/include ${ANDROID_CXX_FLAGS}" )
+ if( BUILD_WITH_ANDROID_NDK )
+  if(ANDROID_ARCH_NAME STREQUAL "arm" )
+   set( ANDROID_CXX_FLAGS "-isystem ${ANDROID_CLANG_TOOLCHAIN_ROOT}/lib/clang/${ANDROID_CLANG_VERSION}/include ${ANDROID_CXX_FLAGS}" )
+  endif()
+  set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} -target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS} -Qunused-arguments" )
+ elseif( BUILD_WITH_STANDALONE_TOOLCHAIN )
+  set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS} -Qunused-arguments" )
  endif()
- set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} -target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS} -Qunused-arguments" )
 endif()
 
 # cache flags
@@ -1329,6 +1342,19 @@ endif()
 # global includes and link directories
 include_directories( SYSTEM "${ANDROID_SYSROOT}/usr/include" ${ANDROID_STL_INCLUDE_DIRS} )
 link_directories( "${CMAKE_INSTALL_PREFIX}/libs/${ANDROID_NDK_ABI_NAME}" )
+
+# setup output directories
+set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH "root for library output, set this to change where android libs are installed to" )
+set( CMAKE_INSTALL_PREFIX "${ANDROID_TOOLCHAIN_ROOT}/user" CACHE STRING "path for installing" )
+
+if(NOT _CMAKE_IN_TRY_COMPILE)
+ if( EXISTS "${CMAKE_SOURCE_DIR}/jni/CMakeLists.txt" )
+  set( EXECUTABLE_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/bin/${ANDROID_NDK_ABI_NAME}" CACHE PATH "Output directory for applications" )
+ else()
+  set( EXECUTABLE_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/bin" CACHE PATH "Output directory for applications" )
+ endif()
+ set( LIBRARY_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ANDROID_NDK_ABI_NAME}" CACHE PATH "path for android libs" )
+endif()
 
 # set these global flags for cmake client scripts to change behavior
 set( ANDROID True )
