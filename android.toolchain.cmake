@@ -1281,13 +1281,18 @@ if( ANDROID_RELRO )
 endif()
 
 if( ANDROID_COMPILER_IS_CLANG )
+ set( ANDROID_CXX_FLAGS "-Qunused-arguments ${ANDROID_CXX_FLAGS}" )
+ if( ARMEABI_V7A AND NOT ANDROID_FORCE_ARM_BUILD )
+  set( ANDROID_CXX_FLAGS_RELEASE "-target thumbv7-none-linux-androideabi ${ANDROID_CXX_FLAGS_RELEASE}" )
+  set( ANDROID_CXX_FLAGS_DEBUG   "-target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS_DEBUG}" )
+ else()
+  set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS}" )
+ endif()
  if( BUILD_WITH_ANDROID_NDK )
   if(ANDROID_ARCH_NAME STREQUAL "arm" )
    set( ANDROID_CXX_FLAGS "-isystem ${ANDROID_CLANG_TOOLCHAIN_ROOT}/lib/clang/${ANDROID_CLANG_VERSION}/include ${ANDROID_CXX_FLAGS}" )
   endif()
-  set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} -target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS} -Qunused-arguments" )
- elseif( BUILD_WITH_STANDALONE_TOOLCHAIN )
-  set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS} -Qunused-arguments" )
+  set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} ${ANDROID_CXX_FLAGS}" )
  endif()
 endif()
 
@@ -1532,6 +1537,7 @@ endif()
 #   ANDROID_RTTI : if rtti is enabled by the runtime
 #   ANDROID_EXCEPTIONS : if exceptions are enabled by the runtime
 #   ANDROID_GCC_TOOLCHAIN_NAME : read-only, differs from ANDROID_TOOLCHAIN_NAME only if clang is used
+#   ANDROID_CLANG_VERSION : version of clang compiler if clang is used
 #
 # Defaults:
 #   ANDROID_DEFAULT_NDK_API_LEVEL
