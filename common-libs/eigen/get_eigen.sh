@@ -1,6 +1,6 @@
 #!/bin/bash
 if [ ! -e eigen-android ]; then
-hg clone https://bitbucket.org/eigen/eigen eigen-android
+hg clone https://bitbucket.org/eigen/eigen eigen-master
 else
-cd eigen-android && hg pull && hg update
+cd eigen-master && hg pull && hg update
 fi
