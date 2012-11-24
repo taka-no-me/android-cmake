@@ -1,74 +1,53 @@
-cmake_minimum_required(VERSION 2.8)
-
+cmake_minimum_required(VERSION 2.6.3)
 project(android-boost)
 
 #find patched boost directory
-set(boost_root ${CMAKE_CURRENT_SOURCE_DIR}/boost_1_45_0 CACHE PATH 
-    "Boost 1.45.0 patched for android")
+set(boost_root ${CMAKE_CURRENT_SOURCE_DIR}/boost-trunk CACHE PATH "Boost repo")
 
 if(NOT EXISTS ${boost_root})
 message(FATAL_ERROR
   "${boost_root} does not exist!
-    Please run ${CMAKE_CURRENT_SOURCE_DIR}/get_boost.sh to get a patched copy of
-    boost 1.45.0
-    ")
+    Please run ${CMAKE_CURRENT_SOURCE_DIR}/get_boost.sh to get a copy of boost source")
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -DNO_BZIP2" )
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -DNO_BZIP2" )
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNO_BZIP2")
 
-include_directories(${boost_root} )
-
-file(GLOB lib_srcs ${boost_root}/libs/system/src/*.cpp)
-
-add_library( boost_system ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/filesystem/v2/src/*.cpp)
-
-add_library( boost_filesystem ${lib_srcs})
-
-set(lib_dir ${boost_root}/libs/iostreams/src)
-set(lib_srcs ${lib_dir}/file_descriptor.cpp   ${lib_dir}/gzip.cpp   ${lib_dir}/mapped_file.cpp   ${lib_dir}/zlib.cpp)
-
-
-add_library( boost_iostreams ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/program_options/src/*.cpp)
-
-add_library( boost_program_options ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/regex/src/*.cpp)
-
-add_library( boost_regex ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/signals/src/*.cpp)
-
-add_library( boost_signals ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/thread/src/pthread/*.cpp)
-
-add_library( boost_thread ${lib_srcs})
-
-file(GLOB lib_srcs ${boost_root}/libs/date_time/src/gregorian/*.cpp ${boost_root}/libs/date_time/src/posix_time/*.cpp)
-
-add_library( boost_date_time ${lib_srcs})
-
-#target_link_libraries(boost_filesystem boost_system)
-
 set(Boost_INCLUDE_DIRS ${boost_root})
-set(Boost_LIBRARIES boost_filesystem boost_system boost_program_options boost_iostreams boost_date_time)
+set(Boost_LIBRARIES)
 set(Boost_LINK_DIRS ${LIBRARY_OUTPUT_PATH})
+
+macro(add_boost_lib name)
+    file(GLOB_RECURSE lib_srcs "${boost_root}/libs/${name}/src/*.cpp")
+    foreach(arg ${ARGN})
+        if("${arg}" MATCHES "^-")
+            string(REGEX REPLACE "^-" "${boost_root}/libs/${name}/src/" arg "${arg}")
+            list(REMOVE_ITEM lib_srcs ${arg})
+        endif()
+    endforeach()
+    add_library( boost_${name} ${lib_srcs} )
+    list(APPEND Boost_LIBRARIES boost_${name})
+    install(TARGETS boost_${name} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+endmacro()
+
+macro(add_boost_lib_subdir name src_subdir)
+    file(GLOB_RECURSE lib_srcs ${boost_root}/libs/${name}/src/${src_subdir}/*.cpp)
+    add_library( boost_${name} ${lib_srcs} )
+    list(APPEND Boost_LIBRARIES boost_${name})
+    install(TARGETS boost_${name} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+endmacro()
+
+include_directories(${boost_root} ${CMAKE_CURRENT_SOURCE_DIR})
+install(DIRECTORY ${boost_root}/boost DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+
+add_boost_lib(system)
+add_boost_lib(filesystem)
+add_boost_lib(iostreams -bzip2.cpp)
+add_boost_lib(program_options)
+add_boost_lib(regex)
+add_boost_lib(signals)
+add_boost_lib_subdir(thread pthread)
+add_boost_lib(date_time)
 
 configure_file(${CMAKE_SOURCE_DIR}/BoostConfig.cmake.in
                ${CMAKE_BINARY_DIR}/BoostConfig.cmake @ONLY)
-               
-install(DIRECTORY ${boost_root}/boost DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(TARGETS boost_system DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_filesystem DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_program_options DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_iostreams DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_regex DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_signals DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_thread DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS boost_date_time DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-

@@ -1,6 +1,0 @@
-# use glob syntax.
-syntax: glob
-download
-libs
-
-
