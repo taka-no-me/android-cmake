@@ -50,7 +50,7 @@
    #else
       #define GLAPI __declspec(dllimport)
    #endif
-#elif defined(ANDROID)
+#elif defined(__ANDROID__)
     #include <GLES/gl.h>
     #define APIENTRY 
     #define GLAPI 
