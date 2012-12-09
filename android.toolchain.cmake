@@ -280,6 +280,8 @@
 #   - November 2012
 #     [+] updated for NDK r8c
 #     [+] added support for clang compiler
+#   - December 2012
+#     [+] suppress warning about unused CMAKE_TOOLCHAIN_FILE variable
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -287,6 +289,10 @@ cmake_minimum_required( VERSION 2.6.3 )
 if( DEFINED CMAKE_CROSSCOMPILING )
  # subsequent toolchain loading is not really needed
  return()
+endif()
+
+if( CMAKE_TOOLCHAIN_FILE )
+ # touch toolchain variable only to suppress "unused variable" warning
 endif()
 
 get_property( _CMAKE_IN_TRY_COMPILE GLOBAL PROPERTY IN_TRY_COMPILE )
