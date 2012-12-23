@@ -1157,7 +1157,7 @@ endif()
 
 # NDK flags
 if( ARMEABI OR ARMEABI_V7A )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fpic -D__ARM_ARCH_5__ -D__ARM_ARCH_5T__ -D__ARM_ARCH_5E__ -D__ARM_ARCH_5TE__" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fpic" )
  if( NOT ANDROID_FORCE_ARM_BUILD AND NOT ARMEABI_V6 )
   # It is recommended to use the -mthumb compiler flag to force the generation
   # of 16-bit Thumb-1 instructions (the default being 32-bit ARM ones).
