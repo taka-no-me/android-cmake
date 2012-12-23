@@ -285,6 +285,7 @@
 #     [+] adjust API level to closest compatible as NDK does
 #     [~] fixed ccache full path search
 #     [+] updated for NDK r8d
+#     [~] compiler options are aligned with NDK r8d
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -1157,38 +1158,48 @@ endif()
 
 # NDK flags
 if( ARMEABI OR ARMEABI_V7A )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fpic" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fpic -funwind-tables" )
  if( NOT ANDROID_FORCE_ARM_BUILD AND NOT ARMEABI_V6 )
-  # It is recommended to use the -mthumb compiler flag to force the generation
-  # of 16-bit Thumb-1 instructions (the default being 32-bit ARM ones).
-  set( ANDROID_CXX_FLAGS_RELEASE "-mthumb" )
-  set( ANDROID_CXX_FLAGS_DEBUG   "-marm -finline-limit=64" )
+  set( ANDROID_CXX_FLAGS_RELEASE "-mthumb -fomit-frame-pointer -fno-strict-aliasing" )
+  set( ANDROID_CXX_FLAGS_DEBUG   "-marm -fno-omit-frame-pointer -fno-strict-aliasing" )
+  if( NOT ANDROID_COMPILER_IS_CLANG )
+   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -finline-limit=64" )
+  endif()
  else()
   # always compile ARMEABI_V6 in arm mode; otherwise there is no difference from ARMEABI
-  # O3 instead of O2/Os in release mode - like cmake sets for desktop gcc
-  set( ANDROID_CXX_FLAGS_RELEASE "-marm" )
-  set( ANDROID_CXX_FLAGS_DEBUG   "-marm -finline-limit=300" )
+  set( ANDROID_CXX_FLAGS_RELEASE "-marm -fomit-frame-pointer -fstrict-aliasing" )
+  set( ANDROID_CXX_FLAGS_DEBUG   "-marm -fno-omit-frame-pointer -fno-strict-aliasing" )
+  if( NOT ANDROID_COMPILER_IS_CLANG )
+   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -funswitch-loops -finline-limit=300" )
+  endif()
  endif()
 elseif( X86 )
- set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -funwind-tables" )
- set( ANDROID_CXX_FLAGS_RELEASE "" )
- set( ANDROID_CXX_FLAGS_DEBUG   "-finline-limit=300" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -funwind-tables" )
+ if( NOT ANDROID_COMPILER_IS_CLANG )
+  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -funswitch-loops -finline-limit=300" )
+ else()
+  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fPIC" )
+ endif()
+ set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer -fstrict-aliasing" )
+ set( ANDROID_CXX_FLAGS_DEBUG   "-fno-omit-frame-pointer -fno-strict-aliasing" )
 elseif( MIPS )
- set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -fpic -funwind-tables -fmessage-length=0 -fno-inline-functions-called-once -frename-registers" )
- set( ANDROID_CXX_FLAGS_RELEASE "-finline-limit=300 -fno-strict-aliasing" )
- set( ANDROID_CXX_FLAGS_DEBUG   "-finline-functions -fgcse-after-reload -frerun-cse-after-loop" )
+ set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -fpic -fno-strict-aliasing -finline-functions -ffunction-sections -funwind-tables -fmessage-length=0" )
+ set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer" )
+ set( ANDROID_CXX_FLAGS_DEBUG   "-fno-omit-frame-pointer" )
+ if( NOT ANDROID_COMPILER_IS_CLANG )
+  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fno-inline-functions-called-once -fgcse-after-reload -frerun-cse-after-loop -frename-registers" )
+  set( ANDROID_CXX_FLAGS_RELEASE "${ANDROID_CXX_FLAGS_RELEASE} -funswitch-loops -finline-limit=300" )
+ endif()
 elseif()
  set( ANDROID_CXX_FLAGS_RELEASE "" )
  set( ANDROID_CXX_FLAGS_DEBUG   "" )
 endif()
 
-if( NOT X86 )
- set( ANDROID_CXX_FLAGS         "-Wno-psabi ${ANDROID_CXX_FLAGS}" )
-endif()
-
 set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fsigned-char" ) # good/necessary when porting desktop libraries
-set( ANDROID_CXX_FLAGS_RELEASE "${ANDROID_CXX_FLAGS_RELEASE} -fomit-frame-pointer" )
-set( ANDROID_CXX_FLAGS_DEBUG   "${ANDROID_CXX_FLAGS_DEBUG} -fno-strict-aliasing -fno-omit-frame-pointer" )
+
+if( NOT X86 )
+ set( ANDROID_CXX_FLAGS "-Wno-psabi ${ANDROID_CXX_FLAGS}" )
+endif()
 
 if( NOT ANDROID_COMPILER_VERSION VERSION_LESS "4.6" )
  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -no-canonical-prefixes" ) # see https://android-review.googlesource.com/#/c/47564/
@@ -1329,9 +1340,6 @@ if( ANDROID_COMPILER_IS_CLANG )
   set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} ${ANDROID_CXX_FLAGS}" )
  endif()
  if( BUILD_WITH_ANDROID_NDK )
-  if(ANDROID_ARCH_NAME STREQUAL "arm" )
-   set( ANDROID_CXX_FLAGS "-isystem ${ANDROID_CLANG_TOOLCHAIN_ROOT}/lib/clang/${ANDROID_CLANG_VERSION}/include ${ANDROID_CXX_FLAGS}" )
-  endif()
   set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} ${ANDROID_CXX_FLAGS}" )
  endif()
 endif()
@@ -1346,6 +1354,12 @@ set( CMAKE_C_FLAGS_DEBUG       "-O0 -g -DDEBUG -D_DEBUG" CACHE STRING "c Debug f
 set( CMAKE_SHARED_LINKER_FLAGS ""                        CACHE STRING "shared linker flags" )
 set( CMAKE_MODULE_LINKER_FLAGS ""                        CACHE STRING "module linker flags" )
 set( CMAKE_EXE_LINKER_FLAGS    "-Wl,-z,nocopyreloc"      CACHE STRING "executable linker flags" )
+
+# put flags to cache (for debug purpose only)
+set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS}"         CACHE INTERNAL "Android specific c/c++ flags" )
+set( ANDROID_CXX_FLAGS_RELEASE "${ANDROID_CXX_FLAGS_RELEASE}" CACHE INTERNAL "Android specific c/c++ Release flags" )
+set( ANDROID_CXX_FLAGS_DEBUG   "${ANDROID_CXX_FLAGS_DEBUG}"   CACHE INTERNAL "Android specific c/c++ Debug flags" )
+set( ANDROID_LINKER_FLAGS      "${ANDROID_LINKER_FLAGS}"      CACHE INTERNAL "Android specific c/c++ linker flags" )
 
 # finish flags
 set( CMAKE_CXX_FLAGS           "${ANDROID_CXX_FLAGS} ${CMAKE_CXX_FLAGS}" )
