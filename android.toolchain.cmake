@@ -1,5 +1,5 @@
 # Copyright (c) 2010-2011, Ethan Rublee
-# Copyright (c) 2011-2012, Andrey Kamaev
+# Copyright (c) 2011-2013, Andrey Kamaev
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -286,6 +286,9 @@
 #     [~] fixed ccache full path search
 #     [+] updated for NDK r8d
 #     [~] compiler options are aligned with NDK r8d
+#   - March 2013
+#     [+] updated for NDK r8e (x86 version)
+#     [+] support x86_64 version of NDK
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -312,7 +315,7 @@ set( CMAKE_SYSTEM_VERSION 1 )
 # rpath makes low sence for Android
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if(NOT DEFINED ANDROID_NDK_SEARCH_PATHS)
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
@@ -456,17 +459,30 @@ if( ANDROID_FORBID_SYGWIN )
  endif()
 endif()
 
+
 # detect current host platform
+if( NOT DEFINED ANDROID_NDK_HOST_X64 AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "amd64|x86_64|AMD64")
+ set( ANDROID_NDK_HOST_X64 1 CACHE BOOL "Try to use 64-bit compiler toolchain" )
+ mark_as_advanced( ANDROID_NDK_HOST_X64 )
+endif()
+
 set( TOOL_OS_SUFFIX "" )
 if( CMAKE_HOST_APPLE )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "darwin-x86" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME "darwin-x86_64" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME2 "darwin-x86" )
 elseif( CMAKE_HOST_WIN32 )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "windows" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME "windows-x86_64" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME2 "windows" )
  set( TOOL_OS_SUFFIX ".exe" )
 elseif( CMAKE_HOST_UNIX )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "linux-x86" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME "linux-x86_64" )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME2 "linux-x86" )
 else()
  message( FATAL_ERROR "Cross-compilation on your platform is not supported by this cmake toolchain" )
+endif()
+
+if( NOT ANDROID_NDK_HOST_X64 )
+ set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
 endif()
 
 # see if we have path to Android NDK
@@ -516,7 +532,8 @@ if( ANDROID_NDK )
  endif()
  set( ANDROID_NDK "${ANDROID_NDK}" CACHE INTERNAL "Path of the Android NDK" FORCE )
  set( BUILD_WITH_ANDROID_NDK True )
- file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE LIMIT_COUNT 1 REGEX r[0-9]+[a-z]? )
+ file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX r[0-9]+[a-z]? )
+ string( REGEX MATCH r[0-9]+[a-z]? ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
 elseif( ANDROID_STANDALONE_TOOLCHAIN )
  get_filename_component( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" ABSOLUTE )
  # try to detect change
@@ -570,22 +587,21 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
  endif()
 endif()
 
-macro( __GLOB_NDK_TOOLCHAINS __availableToolchainsVar )
- foreach( __toolchain ${${__availableToolchainsVar}} )
+macro( __GLOB_NDK_TOOLCHAINS __availableToolchainsVar __availableToolchainsLst __host_system_name )
+ foreach( __toolchain ${${__availableToolchainsLst}} )
   if( "${__toolchain}" MATCHES "-clang3[.][0-9]$" AND NOT EXISTS "${ANDROID_NDK}/toolchains/${__toolchain}/prebuilt/" )
    string( REGEX REPLACE "-clang3[.][0-9]$" "-4.6" __gcc_toolchain "${__toolchain}" )
   else()
    set( __gcc_toolchain "${__toolchain}" )
   endif()
-  __DETECT_TOOLCHAIN_MACHINE_NAME( __machine "${ANDROID_NDK}/toolchains/${__gcc_toolchain}/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
+  __DETECT_TOOLCHAIN_MACHINE_NAME( __machine "${ANDROID_NDK}/toolchains/${__gcc_toolchain}/prebuilt/${__host_system_name}" )
   if( __machine )
    string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9]+)?$" __version "${__gcc_toolchain}" )
    string( REGEX MATCH "^[^-]+" __arch "${__gcc_toolchain}" )
    list( APPEND __availableToolchainMachines "${__machine}" )
    list( APPEND __availableToolchainArchs "${__arch}" )
    list( APPEND __availableToolchainCompilerVersions "${__version}" )
-  else()
-   list( REMOVE_ITEM ${__availableToolchainsVar} "${__toolchain}" )
+   list( APPEND ${__availableToolchainsVar} "${__toolchain}" )
   endif()
   unset( __gcc_toolchain )
  endforeach()
@@ -601,17 +617,29 @@ if( BUILD_WITH_ANDROID_NDK )
  set( __availableToolchainCompilerVersions "" )
  if( ANDROID_TOOLCHAIN_NAME AND EXISTS "${ANDROID_NDK}/toolchains/${ANDROID_TOOLCHAIN_NAME}/" )
   # do not go through all toolchains if we know the name
-  set( __availableToolchains "${ANDROID_TOOLCHAIN_NAME}" )
-  __GLOB_NDK_TOOLCHAINS( __availableToolchains )
+  set( __availableToolchainsLst "${ANDROID_TOOLCHAIN_NAME}" )
+  __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst ${ANDROID_NDK_HOST_SYSTEM_NAME} )
+  if( NOT __availableToolchains AND NOT ANDROID_NDK_HOST_SYSTEM_NAME STREQUAL ANDROID_NDK_HOST_SYSTEM_NAME2 )
+   __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
+   if( __availableToolchains )
+    set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
+   endif()
+  endif()
  endif()
  if( NOT __availableToolchains )
-  file( GLOB __availableToolchains RELATIVE "${ANDROID_NDK}/toolchains" "${ANDROID_NDK}/toolchains/*" )
+  file( GLOB __availableToolchainsLst RELATIVE "${ANDROID_NDK}/toolchains" "${ANDROID_NDK}/toolchains/*" )
   if( __availableToolchains )
-   list(SORT __availableToolchains) # we need clang to go after gcc
+   list(SORT __availableToolchainsLst) # we need clang to go after gcc
   endif()
-  __LIST_FILTER( __availableToolchains "^[.]" )
-  __LIST_FILTER( __availableToolchains "llvm" )
-  __GLOB_NDK_TOOLCHAINS( __availableToolchains )
+  __LIST_FILTER( __availableToolchainsLst "^[.]" )
+  __LIST_FILTER( __availableToolchainsLst "llvm" )
+  __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst ${ANDROID_NDK_HOST_SYSTEM_NAME} )
+  if( NOT __availableToolchains AND NOT ANDROID_NDK_HOST_SYSTEM_NAME STREQUAL ANDROID_NDK_HOST_SYSTEM_NAME2 )
+   __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
+   if( __availableToolchains )
+    set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
+   endif()
+  endif()
  endif()
  if( NOT __availableToolchains )
   message( FATAL_ERROR "Could not find any working toolchain in the NDK. Probably your Android NDK is broken." )
@@ -624,11 +652,11 @@ set( __uniqToolchainArchNames ${__availableToolchainArchs} )
 list( REMOVE_DUPLICATES __uniqToolchainArchNames )
 list( SORT __uniqToolchainArchNames )
 foreach( __arch ${__uniqToolchainArchNames} )
-list( APPEND ANDROID_SUPPORTED_ABIS ${ANDROID_SUPPORTED_ABIS_${__arch}} )
+ list( APPEND ANDROID_SUPPORTED_ABIS ${ANDROID_SUPPORTED_ABIS_${__arch}} )
 endforeach()
 unset( __uniqToolchainArchNames )
 if( NOT ANDROID_SUPPORTED_ABIS )
-message( FATAL_ERROR "No one of known Android ABIs is supported by this cmake toolchain." )
+ message( FATAL_ERROR "No one of known Android ABIs is supported by this cmake toolchain." )
 endif()
 
 # choose target ABI
@@ -1197,7 +1225,7 @@ endif()
 
 set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -fsigned-char" ) # good/necessary when porting desktop libraries
 
-if( NOT X86 )
+if( NOT X86 AND NOT ANDROID_COMPILER_IS_CLANG )
  set( ANDROID_CXX_FLAGS "-Wno-psabi ${ANDROID_CXX_FLAGS}" )
 endif()
 
@@ -1491,6 +1519,7 @@ endmacro()
 if( NOT PROJECT_NAME STREQUAL "CMAKE_TRY_COMPILE" )
  set( __toolchain_config "")
  foreach( __var NDK_CCACHE  LIBRARY_OUTPUT_PATH_ROOT  ANDROID_FORBID_SYGWIN  ANDROID_SET_OBSOLETE_VARIABLES
+                ANDROID_NDK_HOST_X64
                 ANDROID_NDK
                 ANDROID_STANDALONE_TOOLCHAIN
                 ANDROID_TOOLCHAIN_NAME
@@ -1547,6 +1576,7 @@ endif()
 #   ANDROID_NDK
 #   ANDROID_STANDALONE_TOOLCHAIN
 #   ANDROID_TOOLCHAIN_NAME : the NDK name of compiler toolchain
+#   ANDROID_NDK_HOST_X64 : try to use x86_64 toolchain (default for x64 host systems)
 #   LIBRARY_OUTPUT_PATH_ROOT : <any valid path>
 #   NDK_CCACHE : <path to your ccache executable>
 # Obsolete:
@@ -1571,7 +1601,7 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86" or "mips" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b, r8c, r8d; set only for NDK
+#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b, r8c, r8d, r8e; set only for NDK
 #   ANDROID_ARCH_NAME : "arm" or "x86" or "mips" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
