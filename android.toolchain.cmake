@@ -520,17 +520,6 @@ endif( NOT ANDROID_NDK )
 # remember found paths
 if( ANDROID_NDK )
  get_filename_component( ANDROID_NDK "${ANDROID_NDK}" ABSOLUTE )
- # try to detect change
- if( CMAKE_AR )
-  string( LENGTH "${ANDROID_NDK}" __length )
-  string( SUBSTRING "${CMAKE_AR}" 0 ${__length} __androidNdkPreviousPath )
-  if( NOT __androidNdkPreviousPath STREQUAL ANDROID_NDK )
-   message( FATAL_ERROR "It is not possible to change the path to the NDK on subsequent CMake run. You must remove all generated files from your build folder first.
-   " )
-  endif()
-  unset( __androidNdkPreviousPath )
-  unset( __length )
- endif()
  set( ANDROID_NDK "${ANDROID_NDK}" CACHE INTERNAL "Path of the Android NDK" FORCE )
  set( BUILD_WITH_ANDROID_NDK True )
  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT" )
@@ -582,6 +571,19 @@ if( BUILD_WITH_ANDROID_NDK )
   set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/toolchains" )
   set( ANDROID_NDK_TOOLCHAINS_SUBPATH  "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
   set( ANDROID_NDK_TOOLCHAINS_SUBPATH2 "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME2}" )
+ endif()
+ get_filename_component( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK_TOOLCHAINS_PATH}" ABSOLUTE )
+
+ # try to detect change of NDK
+ if( CMAKE_AR )
+  string( LENGTH "${ANDROID_NDK_TOOLCHAINS_PATH}" __length )
+  string( SUBSTRING "${CMAKE_AR}" 0 ${__length} __androidNdkPreviousPath )
+  if( NOT __androidNdkPreviousPath STREQUAL ANDROID_NDK_TOOLCHAINS_PATH )
+   message( FATAL_ERROR "It is not possible to change the path to the NDK on subsequent CMake run. You must remove all generated files from your build folder first.
+   " )
+  endif()
+  unset( __androidNdkPreviousPath )
+  unset( __length )
  endif()
 endif()
 
