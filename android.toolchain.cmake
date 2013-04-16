@@ -1142,7 +1142,7 @@ unset( _ndk_ccache )
 
 # setup the cross-compiler
 if( NOT CMAKE_C_COMPILER )
- if( NDK_CCACHE )
+ if( NDK_CCACHE AND NOT ANDROID_SYSROOT MATCHES "[ ;\"]" )
   set( CMAKE_C_COMPILER   "${NDK_CCACHE}" CACHE PATH "ccache as C compiler" )
   set( CMAKE_CXX_COMPILER "${NDK_CCACHE}" CACHE PATH "ccache as C++ compiler" )
   if( ANDROID_COMPILER_IS_CLANG )
@@ -1214,11 +1214,25 @@ set( CMAKE_ASM_SOURCE_FILE_EXTENSIONS s S asm )
 remove_definitions( -DANDROID )
 add_definitions( -DANDROID )
 
-if(ANDROID_SYSROOT MATCHES "[ ;\"]")
- set( ANDROID_CXX_FLAGS "'--sysroot=${ANDROID_SYSROOT}'" )
+if( ANDROID_SYSROOT MATCHES "[ ;\"]" )
+ if( CMAKE_HOST_WIN32 )
+  # try to convert path to 8.3 form
+  file( WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/cvt83.cmd" "@echo %~s1" )
+  execute_process( COMMAND "$ENV{ComSpec}" /c "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/cvt83.cmd" "${ANDROID_SYSROOT}"
+                   OUTPUT_VARIABLE __path OUTPUT_STRIP_TRAILING_WHITESPACE
+                   RESULT_VARIABLE __result ERROR_QUIET )
+  if( __result EQUAL 0 )
+   file( TO_CMAKE_PATH "${__path}" ANDROID_SYSROOT )
+   set( ANDROID_CXX_FLAGS "--sysroot=${ANDROID_SYSROOT}" )
+  else()
+   set( ANDROID_CXX_FLAGS "--sysroot=\"${ANDROID_SYSROOT}\"" )
+  endif()
+ else()
+  set( ANDROID_CXX_FLAGS "'--sysroot=${ANDROID_SYSROOT}'" )
+ endif()
  if( NOT _CMAKE_IN_TRY_COMPILE )
   # quotes can break try_compile and compiler identification
-  message(WARNING "Your Android system root has non-alphanumeric symbols. It can break compiler features detection and the whole build.")
+  message(WARNING "Path to your Android NDK (or toolchain) has non-alphanumeric symbols.\nThe build might be broken.\n")
  endif()
 else()
  set( ANDROID_CXX_FLAGS "--sysroot=${ANDROID_SYSROOT}" )
