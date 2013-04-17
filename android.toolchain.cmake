@@ -289,6 +289,9 @@
 #   - March 2013
 #     [+] updated for NDK r8e (x86 version)
 #     [+] support x86_64 version of NDK
+#   - April 2013
+#     [+] support non-release NDK layouts (from Linaro git and Android git)
+#     [~] automatically detect if explicit link to crtbegin_*.o is needed
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -558,7 +561,14 @@ endif()
 # android NDK layout
 if( BUILD_WITH_ANDROID_NDK )
  if( NOT DEFINED ANDROID_NDK_LAYOUT )
-  set( ANDROID_NDK_LAYOUT "RELEASE" )
+  # try to automatically detect the layout
+  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT")
+   set( ANDROID_NDK_LAYOUT "RELEASE" )
+  elseif( EXISTS "${ANDROID_NDK}/../../linux-x86/toolchain/" )
+   set( ANDROID_NDK_LAYOUT "LINARO" )
+  elseif( EXISTS "${ANDROID_NDK}/../../gcc/" )
+   set( ANDROID_NDK_LAYOUT "ANDROID" )
+  endif()
  endif()
  set( ANDROID_NDK_LAYOUT "${ANDROID_NDK_LAYOUT}" CACHE STRING "The inner layout of NDK" )
  mark_as_advanced( ANDROID_NDK_LAYOUT )
@@ -1670,6 +1680,7 @@ endif()
 #   ANDROID_STANDALONE_TOOLCHAIN
 #   ANDROID_TOOLCHAIN_NAME : the NDK name of compiler toolchain
 #   ANDROID_NDK_HOST_X64 : try to use x86_64 toolchain (default for x64 host systems)
+#   ANDROID_NDK_LAYOUT : the inner NDK structure (RELEASE, LINARO, ANDROID)
 #   LIBRARY_OUTPUT_PATH_ROOT : <any valid path>
 #   NDK_CCACHE : <path to your ccache executable>
 # Obsolete:
@@ -1715,6 +1726,7 @@ endif()
 #   ANDROID_EXCEPTIONS : if exceptions are enabled by the runtime
 #   ANDROID_GCC_TOOLCHAIN_NAME : read-only, differs from ANDROID_TOOLCHAIN_NAME only if clang is used
 #   ANDROID_CLANG_VERSION : version of clang compiler if clang is used
+#   ANDROID_LIBM_PATH : path to libm.so (set to something like $(TOP)/out/target/product/<product_name>/obj/lib/libm.so) to workaround unresolved `sincos`
 #
 # Defaults:
 #   ANDROID_DEFAULT_NDK_API_LEVEL
