@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # ------------------------------------------------------------------------------
-#  Android CMake toolchain file, for use with the Android NDK r5-r8
+#  Android CMake toolchain file, for use with the Android NDK r5-r9
 #  Requires cmake 2.6.3 or newer (2.8.5 or newer is recommended).
 #  See home page: https://github.com/taka-no-me/android-cmake
 #
@@ -87,8 +87,7 @@
 #        "armeabi-v6 with VFP" - tuned for ARMv6 processors having VFP.
 #        "x86" - matches to the NDK ABI with the same name.
 #            See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
-#        "mips" - matches to the NDK ABI with the same name
-#            (It is not tested on real devices by the authos of this toolchain)
+#        "mips" - matches to the NDK ABI with the same name.
 #            See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
 #
 #    ANDROID_NATIVE_API_LEVEL=android-8 - level of Android API compile for.
@@ -294,6 +293,8 @@
 #     [~] automatically detect if explicit link to crtbegin_*.o is needed
 #   - June 2013
 #     [~] fixed stl include path for standalone toolchain made by NDK >= r8c
+#   - July 2013
+#     [+] updated for NDK r9
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -320,7 +321,7 @@ set( CMAKE_SYSTEM_VERSION 1 )
 # rpath makes low sence for Android
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if(NOT DEFINED ANDROID_NDK_SEARCH_PATHS)
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
@@ -1718,7 +1719,7 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86" or "mips" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b, r8c, r8d, r8e; set only for NDK
+#   ANDROID_NDK_RELEASE : one of r5, r5b, r5c, r6, r6b, r7, r7b, r7c, r8, r8b, r8c, r8d, r8e, r9; set only for NDK
 #   ANDROID_ARCH_NAME : "arm" or "x86" or "mips" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
