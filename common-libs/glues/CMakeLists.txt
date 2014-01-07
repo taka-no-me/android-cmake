@@ -5,6 +5,7 @@ include_directories( ${glues_SOURCE_DIR}/include ${glues_SOURCE_DIR}/include/glu
 file(GLOB lib_srcs ${glues_SOURCE_DIR}/src/*.c)
 
 add_library(glues ${lib_srcs})
+target_link_libraries(glues m GLESv1_CM)
 
 install(DIRECTORY ${glues_SOURCE_DIR}/include/glues DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(TARGETS glues DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
