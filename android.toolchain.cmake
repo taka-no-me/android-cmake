@@ -493,7 +493,9 @@ else()
  message( FATAL_ERROR "Cross-compilation on your platform is not supported by this cmake toolchain" )
 endif()
 
-if( NOT ANDROID_NDK_HOST_X64 )
+# CMAKE_HOST_SYSTEM_PROCESSOR on MacOS X always says i386 on Intel platform
+# So we do not trust ANDROID_NDK_HOST_X64 on Apple hosts
+if( NOT ANDROID_NDK_HOST_X64 AND NOT CMAKE_HOST_APPLE)
  set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
 endif()
 
