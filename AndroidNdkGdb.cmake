@@ -27,6 +27,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# ------------------------------------------------------------------------------
+# Usage:
+# 1. place AndroidNdkGdb.cmake somewhere inside ${CMAKE_MODULE_PATH}
+# 2. inside your project add
+#
+#    include(AndroidNdkGdb)
+#    android_ndk_gdb_enable()
+#    # for each target
+#    add_library(MyLibrary ...)
+#    android_ndk_gdb_debuggable(MyLibrary)    
+
+
 # add gdbserver and general gdb configuration to project
 # also create a mininal NDK skeleton so ndk-gdb finds the paths
 macro(android_ndk_gdb_enable)
