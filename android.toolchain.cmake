@@ -33,9 +33,6 @@
 #  Requires cmake 2.6.3 or newer (2.8.5 or newer is recommended).
 #  See home page: https://github.com/taka-no-me/android-cmake
 #
-#  The file is mantained by the OpenCV project. The latest version can be get at
-#  http://code.opencv.org/projects/opencv/repository/revisions/master/changes/android/android.toolchain.cmake
-#
 #  Usage Linux:
 #   $ export ANDROID_NDK=/absolute/path/to/the/android-ndk
 #   $ mkdir build && cd build
@@ -50,7 +47,7 @@
 #
 #  Usage Windows:
 #     You need native port of make to build your project.
-#     Android NDK r7 (or newer) already has make.exe on board.
+#     Android NDK r7 (and newer) already has make.exe on board.
 #     For older NDK you have to install it separately.
 #     For example, this one: http://gnuwin32.sourceforge.net/packages/make.htm
 #
@@ -76,36 +73,54 @@
 #      used by ndk-build tool from Android NDK.
 #
 #      Possible targets are:
-#        "armeabi" - matches to the NDK ABI with the same name.
-#           See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
-#        "armeabi-v7a" - matches to the NDK ABI with the same name.
-#           See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
+#        "armeabi" - ARMv5TE based CPU with software floating point operations
+#        "armeabi-v7a" - ARMv7 based devices with hardware FPU instructions
+#            this ABI target is used by default
 #        "armeabi-v7a with NEON" - same as armeabi-v7a, but
 #            sets NEON as floating-point unit
 #        "armeabi-v7a with VFPV3" - same as armeabi-v7a, but
-#            sets VFPV3 as floating-point unit (has 32 registers instead of 16).
-#        "armeabi-v6 with VFP" - tuned for ARMv6 processors having VFP.
-#        "x86" - matches to the NDK ABI with the same name.
-#            See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
-#        "mips" - matches to the NDK ABI with the same name.
-#            See ${ANDROID_NDK}/docs/CPU-ARCH-ABIS.html for the documentation.
+#            sets VFPV3 as floating-point unit (has 32 registers instead of 16)
+#        "armeabi-v6 with VFP" - tuned for ARMv6 processors having VFP
+#        "x86" - IA-32 instruction set
+#        "mips" - MIPS32 instruction set
+#
+#      64-bit ABIs for NDK r10 and newer:
+#        "arm64-v8a" - ARMv8 AArch64 instruction set
+#        "x86_64" - Intel64 instruction set (r1)
+#        "mips64" - MIPS64 instruction set (r6)
 #
 #    ANDROID_NATIVE_API_LEVEL=android-8 - level of Android API compile for.
 #      Option is read-only when standalone toolchain is used.
+#      Note: building for "android-L" requires explicit configuration.
 #
-#    ANDROID_TOOLCHAIN_NAME=arm-linux-androideabi-4.6 - the name of compiler
+#    ANDROID_TOOLCHAIN_NAME=arm-linux-androideabi-4.9 - the name of compiler
 #      toolchain to be used. The list of possible values depends on the NDK
-#      version. For NDK r8c the possible values are:
+#      version. For NDK r10c the possible values are:
 #
-#        * arm-linux-androideabi-4.4.3
+#        * aarch64-linux-android-4.9
+#        * aarch64-linux-android-clang3.4
+#        * aarch64-linux-android-clang3.5
 #        * arm-linux-androideabi-4.6
-#        * arm-linux-androideabi-clang3.1
-#        * mipsel-linux-android-4.4.3
+#        * arm-linux-androideabi-4.8
+#        * arm-linux-androideabi-4.9 (default)
+#        * arm-linux-androideabi-clang3.4
+#        * arm-linux-androideabi-clang3.5
+#        * mips64el-linux-android-4.9
+#        * mips64el-linux-android-clang3.4
+#        * mips64el-linux-android-clang3.5
 #        * mipsel-linux-android-4.6
-#        * mipsel-linux-android-clang3.1
-#        * x86-4.4.3
+#        * mipsel-linux-android-4.8
+#        * mipsel-linux-android-4.9
+#        * mipsel-linux-android-clang3.4
+#        * mipsel-linux-android-clang3.5
 #        * x86-4.6
-#        * x86-clang3.1
+#        * x86-4.8
+#        * x86-4.9
+#        * x86-clang3.4
+#        * x86-clang3.5
+#        * x86_64-4.9
+#        * x86_64-clang3.4
+#        * x86_64-clang3.5
 #
 #    ANDROID_FORCE_ARM_BUILD=OFF - set ON to generate 32-bit ARM instructions
 #      instead of Thumb. Is not available for "x86" (inapplicable) and
@@ -181,8 +196,9 @@
 #    ANDROID and BUILD_ANDROID will be set to true, you may test any of these
 #    variables to make necessary Android-specific configuration changes.
 #
-#    Also ARMEABI or ARMEABI_V7A or X86 or MIPS will be set true, mutually
-#    exclusive. NEON option will be set true if VFP is set to NEON.
+#    Also ARMEABI or ARMEABI_V7A or X86 or MIPS or ARM64_V8A or X86_64 or MIPS64
+#    will be set true, mutually exclusive. NEON option will be set true
+#    if VFP is set to NEON.
 #
 #    LIBRARY_OUTPUT_PATH_ROOT should be set in cache to determine where Android
 #    libraries will be installed.
@@ -190,119 +206,6 @@
 #    under the ${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ANDROID_NDK_ABI_NAME}
 #    (depending on the target ABI). This is convenient for Android packaging.
 #
-#  Change Log:
-#   - initial version December 2010
-#   - April 2011
-#     [+] added possibility to build with NDK (without standalone toolchain)
-#     [+] support cross-compilation on Windows (native, no cygwin support)
-#     [+] added compiler option to force "char" type to be signed
-#     [+] added toolchain option to compile to 32-bit ARM instructions
-#     [+] added toolchain option to disable SWIG search
-#     [+] added platform "armeabi-v7a with VFPV3"
-#     [~] ARM_TARGETS renamed to ARM_TARGET
-#     [+] EXECUTABLE_OUTPUT_PATH is set by toolchain (required on Windows)
-#     [~] Fixed bug with ANDROID_API_LEVEL variable
-#     [~] turn off SWIG search if it is not found first time
-#   - May 2011
-#     [~] ANDROID_LEVEL is renamed to ANDROID_API_LEVEL
-#     [+] ANDROID_API_LEVEL is detected by toolchain if not specified
-#     [~] added guard to prevent changing of output directories on the first
-#         cmake pass
-#     [~] toolchain exits with error if ARM_TARGET is not recognized
-#   - June 2011
-#     [~] default NDK path is updated for version r5c
-#     [+] variable CMAKE_SYSTEM_PROCESSOR is set based on ARM_TARGET
-#     [~] toolchain install directory is added to linker paths
-#     [-] removed SWIG-related stuff from toolchain
-#     [+] added macro find_host_package, find_host_program to search
-#         packages/programs on the host system
-#     [~] fixed path to STL library
-#   - July 2011
-#     [~] fixed options caching
-#     [~] search for all supported NDK versions
-#     [~] allowed spaces in NDK path
-#   - September 2011
-#     [~] updated for NDK r6b
-#   - November 2011
-#     [*] rewritten for NDK r7
-#     [+] x86 toolchain support (experimental)
-#     [+] added "armeabi-v6 with VFP" ABI for ARMv6 processors.
-#     [~] improved compiler and linker flags management
-#     [+] support different build flags for Release and Debug configurations
-#     [~] by default compiler flags the same as used by ndk-build (but only
-#         where reasonable)
-#     [~] ANDROID_NDK_TOOLCHAIN_ROOT is splitted to ANDROID_STANDALONE_TOOLCHAIN
-#         and ANDROID_TOOLCHAIN_ROOT
-#     [~] ARM_TARGET is renamed to ANDROID_ABI
-#     [~] ARMEABI_NDK_NAME is renamed to ANDROID_NDK_ABI_NAME
-#     [~] ANDROID_API_LEVEL is renamed to ANDROID_NATIVE_API_LEVEL
-#   - January 2012
-#     [+] added stlport_static support (experimental)
-#     [+] added special check for cygwin
-#     [+] filtered out hidden files (starting with .) while globbing inside NDK
-#     [+] automatically applied GLESv2 linkage fix for NDK revisions 5-6
-#     [+] added ANDROID_GET_ABI_RAWNAME to get NDK ABI names by CMake flags
-#   - February 2012
-#     [+] updated for NDK r7b
-#     [~] fixed cmake try_compile() command
-#     [~] Fix for missing install_name_tool on OS X
-#   - March 2012
-#     [~] fixed incorrect C compiler flags
-#     [~] fixed CMAKE_SYSTEM_PROCESSOR change on ANDROID_ABI change
-#     [+] improved toolchain loading speed
-#     [+] added assembler language support (.S)
-#     [+] allowed preset search paths and extra search suffixes
-#   - April 2012
-#     [+] updated for NDK r7c
-#     [~] fixed most of problems with compiler/linker flags and caching
-#     [+] added option ANDROID_FUNCTION_LEVEL_LINKING
-#   - May 2012
-#     [+] updated for NDK r8
-#     [+] added mips architecture support
-#   - August 2012
-#     [+] updated for NDK r8b
-#     [~] all intermediate files generated by toolchain are moved to CMakeFiles
-#     [~] libstdc++ and libsupc are removed from explicit link libraries
-#     [+] added CCache support (via NDK_CCACHE environment or cmake variable)
-#     [+] added gold linker support for NDK r8b
-#     [~] fixed mips linker flags for NDK r8b
-#   - September 2012
-#     [+] added NDK release name detection (see ANDROID_NDK_RELEASE)
-#     [+] added support for all C++ runtimes from NDK
-#         (system, gabi++, stlport, gnustl)
-#     [+] improved warnings on known issues of NDKs
-#     [~] use gold linker as default if available (NDK r8b)
-#     [~] globally turned off rpath
-#     [~] compiler options are aligned with NDK r8b
-#   - October 2012
-#     [~] fixed C++ linking: explicitly link with math library (OpenCV #2426)
-#   - November 2012
-#     [+] updated for NDK r8c
-#     [+] added support for clang compiler
-#   - December 2012
-#     [+] suppress warning about unused CMAKE_TOOLCHAIN_FILE variable
-#     [+] adjust API level to closest compatible as NDK does
-#     [~] fixed ccache full path search
-#     [+] updated for NDK r8d
-#     [~] compiler options are aligned with NDK r8d
-#   - March 2013
-#     [+] updated for NDK r8e (x86 version)
-#     [+] support x86_64 version of NDK
-#   - April 2013
-#     [+] support non-release NDK layouts (from Linaro git and Android git)
-#     [~] automatically detect if explicit link to crtbegin_*.o is needed
-#   - June 2013
-#     [~] fixed stl include path for standalone toolchain made by NDK >= r8c
-#   - July 2013
-#     [+] updated for NDK r9
-#   - November 2013
-#     [+] updated for NDK r9b
-#   - December 2013
-#     [+] updated for NDK r9c
-#   - January 2014
-#     [~] fix copying of shared STL
-#   - April 2014
-#     [+] updated for NDK r9d
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
@@ -313,22 +216,30 @@ if( DEFINED CMAKE_CROSSCOMPILING )
 endif()
 
 if( CMAKE_TOOLCHAIN_FILE )
- # touch toolchain variable only to suppress "unused variable" warning
+ # touch toolchain variable to suppress "unused variable" warning
 endif()
 
+# inherit settings in recursive loads
 get_property( _CMAKE_IN_TRY_COMPILE GLOBAL PROPERTY IN_TRY_COMPILE )
 if( _CMAKE_IN_TRY_COMPILE )
  include( "${CMAKE_CURRENT_SOURCE_DIR}/../android.toolchain.config.cmake" OPTIONAL )
 endif()
 
 # this one is important
-set( CMAKE_SYSTEM_NAME Linux )
+if( CMAKE_VERSION VERSION_GREATER "3.0.99" )
+ set( CMAKE_SYSTEM_NAME Android )
+else()
+ set( CMAKE_SYSTEM_NAME Linux )
+endif()
+
 # this one not so much
 set( CMAKE_SYSTEM_VERSION 1 )
 
 # rpath makes low sence for Android
+set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
+# NDK search paths
 set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if(NOT DEFINED ANDROID_NDK_SEARCH_PATHS)
  if( CMAKE_HOST_WIN32 )
@@ -343,6 +254,7 @@ if(NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH)
  set( ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH /opt/android-toolchain )
 endif()
 
+# known ABIs
 set( ANDROID_SUPPORTED_ABIS_arm "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
 set( ANDROID_SUPPORTED_ABIS_arm64 "arm64-v8a" )
 set( ANDROID_SUPPORTED_ABIS_x86 "x86" )
@@ -350,6 +262,7 @@ set( ANDROID_SUPPORTED_ABIS_x86_64 "x86_64" )
 set( ANDROID_SUPPORTED_ABIS_mips "mips" )
 set( ANDROID_SUPPORTED_ABIS_mips64 "mips64" )
 
+# API level defaults
 set( ANDROID_DEFAULT_NDK_API_LEVEL 8 )
 set( ANDROID_DEFAULT_NDK_API_LEVEL_arm64 21 )
 set( ANDROID_DEFAULT_NDK_API_LEVEL_x86 9 )
@@ -543,12 +456,15 @@ if( ANDROID_NDK )
  set( ANDROID_NDK "${ANDROID_NDK}" CACHE INTERNAL "Path of the Android NDK" FORCE )
  set( BUILD_WITH_ANDROID_NDK True )
  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT" )
-  file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX r[0-9]+[a-z]? )
-  string( REGEX MATCH r[0-9]+[a-z]? ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
+  file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX "r[0-9]+[a-z]?" )
+  string( REGEX MATCH "r([0-9]+)([a-z]?)" ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
  else()
   set( ANDROID_NDK_RELEASE "r1x" )
   set( ANDROID_NDK_RELEASE_FULL "unreleased" )
  endif()
+ string( REGEX REPLACE "r([0-9]+)([a-z]?)" "\\1*1000" ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE}" )
+ string( FIND " abcdefghijklmnopqastuvwxyz" "${CMAKE_MATCH_2}" __ndkReleaseLetterNum )
+ math( EXPR ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE_NUM}+${__ndkReleaseLetterNum}" )
 elseif( ANDROID_STANDALONE_TOOLCHAIN )
  get_filename_component( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" ABSOLUTE )
  # try to detect change
@@ -1116,7 +1032,7 @@ if( BUILD_WITH_ANDROID_NDK )
   set( ANDROID_EXCEPTIONS       ON )
   set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_NDK}/sources/cxx-stl/system/include" )
  elseif( ANDROID_STL MATCHES "gabi" )
-  if( ANDROID_NDK_RELEASE STRLESS "r7" )
+  if( ANDROID_NDK_RELEASE_NUM LESS 7000 ) # before r7
    message( FATAL_ERROR "gabi++ is not awailable in your NDK. You have to upgrade to NDK r7 or newer to use gabi++.")
   endif()
   set( ANDROID_RTTI             ON )
@@ -1124,12 +1040,12 @@ if( BUILD_WITH_ANDROID_NDK )
   set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_NDK}/sources/cxx-stl/gabi++/include" )
   set( __libstl                 "${ANDROID_NDK}/sources/cxx-stl/gabi++/libs/${ANDROID_NDK_ABI_NAME}/libgabi++_static.a" )
  elseif( ANDROID_STL MATCHES "stlport" )
-  if( NOT ANDROID_NDK_RELEASE STRLESS "r8d" )
+  if( NOT ANDROID_NDK_RELEASE_NUM LESS 8004 ) # before r8d
    set( ANDROID_EXCEPTIONS       ON )
   else()
    set( ANDROID_EXCEPTIONS       OFF )
   endif()
-  if( ANDROID_NDK_RELEASE STRLESS "r7" )
+  if( ANDROID_NDK_RELEASE_NUM LESS 7000 ) # before r7
    set( ANDROID_RTTI            OFF )
   else()
    set( ANDROID_RTTI            ON )
@@ -1419,7 +1335,7 @@ if( EXISTS "${__libstl}" OR EXISTS "${__libsupcxx}" )
 endif()
 
 # variables controlling optional build flags
-if (ANDROID_NDK_RELEASE STRLESS "r7")
+if( ANDROID_NDK_RELEASE_NUM LESS 7000 ) # before r7
  # libGLESv2.so in NDK's prior to r7 refers to missing external symbols.
  # So this flag option is required for all projects using OpenGL from native.
  __INIT_VARIABLE( ANDROID_SO_UNDEFINED                      VALUES ON )
@@ -1470,9 +1386,9 @@ if( ANDROID_FUNCTION_LEVEL_LINKING )
 endif()
 
 if( ANDROID_COMPILER_VERSION VERSION_EQUAL "4.6" )
- if( ANDROID_GOLD_LINKER AND (CMAKE_HOST_UNIX OR ANDROID_NDK_RELEASE STRGREATER "r8b") AND (ARMEABI OR ARMEABI_V7A OR X86) )
+ if( ANDROID_GOLD_LINKER AND (CMAKE_HOST_UNIX OR ANDROID_NDK_RELEASE_NUM GREATER 8002) AND (ARMEABI OR ARMEABI_V7A OR X86) )
   set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -fuse-ld=gold" )
- elseif( ANDROID_NDK_RELEASE STRGREATER "r8b")
+ elseif( ANDROID_NDK_RELEASE_NUM GREATER 8002 ) # after r8b
   set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -fuse-ld=bfd" )
  elseif( ANDROID_NDK_RELEASE STREQUAL "r8b" AND ARMEABI AND NOT _CMAKE_IN_TRY_COMPILE )
   message( WARNING "The default bfd linker from arm GCC 4.6 toolchain can fail with 'unresolvable R_ARM_THM_CALL relocation' error message. See https://code.google.com/p/android/issues/detail?id=35342
@@ -1802,6 +1718,7 @@ endif()
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86", "mips", "arm64-v8a", "x86_64", "mips64" depending on ANDROID_ABI
 #   ANDROID_NDK_RELEASE : from r5 to r10c; set only for NDK
+#   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor)
 #   ANDROID_ARCH_NAME : "arm", "x86", "mips", "arm64", "x86_64", "mips64" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
