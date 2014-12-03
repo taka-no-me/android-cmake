@@ -907,10 +907,13 @@ unset( __availableToolchainCompilerVersions )
 # choose native API level
 __INIT_VARIABLE( ANDROID_NATIVE_API_LEVEL ENV_ANDROID_NATIVE_API_LEVEL ANDROID_API_LEVEL ENV_ANDROID_API_LEVEL ANDROID_STANDALONE_TOOLCHAIN_API_LEVEL ANDROID_DEFAULT_NDK_API_LEVEL_${ANDROID_ARCH_NAME} ANDROID_DEFAULT_NDK_API_LEVEL )
 if( NOT ANDROID_NATIVE_API_LEVEL STREQUAL "L" )
+  # Remove L from the version numbers (otherwise it would be counted as version 0)
+  string( REGEX MATCHALL "[0-9]+" __SUPPORTED_NATIVE_API_LEVELS "${ANDROID_SUPPORTED_NATIVE_API_LEVELS}" )
+
   string( REGEX MATCH "[0-9]+" ANDROID_NATIVE_API_LEVEL "${ANDROID_NATIVE_API_LEVEL}" )
   # adjust API level
   set( __real_api_level ${ANDROID_DEFAULT_NDK_API_LEVEL_${ANDROID_ARCH_NAME}} )
-  foreach( __level ${ANDROID_SUPPORTED_NATIVE_API_LEVELS} )
+  foreach( __level ${__SUPPORTED_NATIVE_API_LEVELS} )
    if( NOT __level GREATER ANDROID_NATIVE_API_LEVEL AND NOT __level LESS __real_api_level )
     set( __real_api_level ${__level} )
    endif()
