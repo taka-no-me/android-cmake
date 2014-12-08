@@ -200,3 +200,12 @@
 * http://dl.google.com/android/ndk/android-ndk-r10c-darwin-x86_64.bin
 * http://dl.google.com/android/ndk/android-ndk-r10c-linux-x86.bin
 * http://dl.google.com/android/ndk/android-ndk-r10c-linux-x86_64.bin
+
+============== r10d ==============
+
+* http://dl.google.com/android/ndk/android-ndk-r10d-windows-x86.exe
+* http://dl.google.com/android/ndk/android-ndk-r10d-windows-x86_64.exe
+* http://dl.google.com/android/ndk/android-ndk-r10d-darwin-x86.bin
+* http://dl.google.com/android/ndk/android-ndk-r10d-darwin-x86_64.bin
+* http://dl.google.com/android/ndk/android-ndk-r10d-linux-x86.bin
+* http://dl.google.com/android/ndk/android-ndk-r10d-linux-x86_64.bin
