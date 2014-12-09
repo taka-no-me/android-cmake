@@ -27,23 +27,44 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# ------------------------------------------------------------------------------
+# Usage:
+# 1. place AndroidNdkGdb.cmake somewhere inside ${CMAKE_MODULE_PATH}
+# 2. inside your project add
+#
+#    include(AndroidNdkGdb)
+#    android_ndk_gdb_enable()
+#    # for each target
+#    add_library(MyLibrary ...)
+#    android_ndk_gdb_debuggable(MyLibrary)    
+
+
 # add gdbserver and general gdb configuration to project
 # also create a mininal NDK skeleton so ndk-gdb finds the paths
+#
+# the optional parameter defines the path to the android project.
+# uses PROJECT_SOURCE_DIR by default.
 macro(android_ndk_gdb_enable)
     if(ANDROID)
         # create custom target that depends on the real target so it gets executed afterwards
         add_custom_target(NDK_GDB ALL)
         
-        set(NDK_GDB_SOLIB_PATH ${PROJECT_SOURCE_DIR}/obj/local/${ANDROID_NDK_ABI_NAME}/)
+        if(${ARGC})
+            set(ANDROID_PROJECT_DIR ${ARGV0})
+        else()
+            set(ANDROID_PROJECT_DIR ${PROJECT_SOURCE_DIR})
+        endif()
+
+        set(NDK_GDB_SOLIB_PATH ${ANDROID_PROJECT_DIR}/obj/local/${ANDROID_NDK_ABI_NAME}/)
         file(MAKE_DIRECTORY ${NDK_GDB_SOLIB_PATH})
         
         # 1. generate essential Android Makefiles
-        file(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/jni)
-        if(NOT EXISTS ${PROJECT_SOURCE_DIR}/jni/Android.mk)
-            file(WRITE ${PROJECT_SOURCE_DIR}/jni/Android.mk "APP_ABI := ${ANDROID_NDK_ABI_NAME}\n")
+        file(MAKE_DIRECTORY ${ANDROID_PROJECT_DIR}/jni)
+        if(NOT EXISTS ${ANDROID_PROJECT_DIR}/jni/Android.mk)
+            file(WRITE ${ANDROID_PROJECT_DIR}/jni/Android.mk "APP_ABI := ${ANDROID_NDK_ABI_NAME}\n")
         endif()
-        if(NOT EXISTS ${PROJECT_SOURCE_DIR}/jni/Application.mk)
-            file(WRITE ${PROJECT_SOURCE_DIR}/jni/Application.mk "APP_ABI := ${ANDROID_NDK_ABI_NAME}\n")
+        if(NOT EXISTS ${ANDROID_PROJECT_DIR}/jni/Application.mk)
+            file(WRITE ${ANDROID_PROJECT_DIR}/jni/Application.mk "APP_ABI := ${ANDROID_NDK_ABI_NAME}\n")
         endif()
     
         # 2. generate gdb.setup
