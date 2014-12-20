@@ -1233,7 +1233,7 @@ endif()
 
 # NDK flags
 if (ARM64_V8A )
- set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -ffunction-sections -funwind-tables" )
+ set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -funwind-tables" )
  set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer -fstrict-aliasing" )
  set( ANDROID_CXX_FLAGS_DEBUG   "-fno-omit-frame-pointer -fno-strict-aliasing" )
  if( NOT ANDROID_COMPILER_IS_CLANG )
@@ -1263,7 +1263,7 @@ elseif( X86 OR X86_64 )
  set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer -fstrict-aliasing" )
  set( ANDROID_CXX_FLAGS_DEBUG   "-fno-omit-frame-pointer -fno-strict-aliasing" )
 elseif( MIPS OR MIPS64 )
- set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -fno-strict-aliasing -finline-functions -ffunction-sections -funwind-tables -fmessage-length=0" )
+ set( ANDROID_CXX_FLAGS         "${ANDROID_CXX_FLAGS} -fno-strict-aliasing -finline-functions -funwind-tables -fmessage-length=0" )
  set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer" )
  set( ANDROID_CXX_FLAGS_DEBUG   "-fno-omit-frame-pointer" )
  if( NOT ANDROID_COMPILER_IS_CLANG )
@@ -1356,7 +1356,7 @@ __INIT_VARIABLE( ANDROID_RELRO                              VALUES ON )
 
 set( ANDROID_NO_UNDEFINED           ${ANDROID_NO_UNDEFINED}           CACHE BOOL "Show all undefined symbols as linker errors" )
 set( ANDROID_SO_UNDEFINED           ${ANDROID_SO_UNDEFINED}           CACHE BOOL "Allows or disallows undefined symbols in shared libraries" )
-set( ANDROID_FUNCTION_LEVEL_LINKING ${ANDROID_FUNCTION_LEVEL_LINKING} CACHE BOOL "Allows or disallows undefined symbols in shared libraries" )
+set( ANDROID_FUNCTION_LEVEL_LINKING ${ANDROID_FUNCTION_LEVEL_LINKING} CACHE BOOL "Put each function in separate section and enable garbage collection of unused input sections at link time" )
 set( ANDROID_GOLD_LINKER            ${ANDROID_GOLD_LINKER}            CACHE BOOL "Enables gold linker" )
 set( ANDROID_NOEXECSTACK            ${ANDROID_NOEXECSTACK}            CACHE BOOL "Allows or disallows undefined symbols in shared libraries" )
 set( ANDROID_RELRO                  ${ANDROID_RELRO}                  CACHE BOOL "Enables RELRO - a memory corruption mitigation technique" )
@@ -1701,6 +1701,7 @@ endif()
 #   ANDROID_FORCE_ARM_BUILD : ON/OFF
 #   ANDROID_STL_FORCE_FEATURES : ON/OFF
 #   ANDROID_SET_OBSOLETE_VARIABLES : ON/OFF
+#   ANDROID_LIBM_PATH : path to libm.so (set to something like $(TOP)/out/target/product/<product_name>/obj/lib/libm.so) to workaround unresolved `sincos`
 # Can be set only at the first run:
 #   ANDROID_NDK
 #   ANDROID_STANDALONE_TOOLCHAIN
@@ -1756,7 +1757,6 @@ endif()
 #   ANDROID_RTTI : if rtti is enabled by the runtime
 #   ANDROID_EXCEPTIONS : if exceptions are enabled by the runtime
 #   ANDROID_GCC_TOOLCHAIN_NAME : read-only, differs from ANDROID_TOOLCHAIN_NAME only if clang is used
-#   ANDROID_LIBM_PATH : path to libm.so (set to something like $(TOP)/out/target/product/<product_name>/obj/lib/libm.so) to workaround unresolved `sincos`
 #
 # Defaults:
 #   ANDROID_DEFAULT_NDK_API_LEVEL
