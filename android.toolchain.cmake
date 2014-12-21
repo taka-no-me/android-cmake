@@ -1652,7 +1652,7 @@ if( NOT PROJECT_NAME STREQUAL "CMAKE_TRY_COMPILE" )
                 ANDROID_APP_PIE
                 )
   if( DEFINED ${__var} )
-   if( "${__var}" MATCHES " ")
+   if( ${__var} MATCHES " ")
     set( __toolchain_config "${__toolchain_config}set( ${__var} \"${${__var}}\" CACHE INTERNAL \"\" )\n" )
    else()
     set( __toolchain_config "${__toolchain_config}set( ${__var} ${${__var}} CACHE INTERNAL \"\" )\n" )
