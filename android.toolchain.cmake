@@ -30,17 +30,11 @@
 
 # ------------------------------------------------------------------------------
 #  Android CMake toolchain file, for use with the Android NDK r5-r10d
-#  Requires cmake 2.6.3 or newer (2.8.5 or newer is recommended).
+#  Requires cmake 2.6.3 or newer (2.8.9 or newer is recommended).
 #  See home page: https://github.com/taka-no-me/android-cmake
 #
 #  Usage Linux:
 #   $ export ANDROID_NDK=/absolute/path/to/the/android-ndk
-#   $ mkdir build && cd build
-#   $ cmake -DCMAKE_TOOLCHAIN_FILE=path/to/the/android.toolchain.cmake ..
-#   $ make -j8
-#
-#  Usage Linux (using standalone toolchain):
-#   $ export ANDROID_STANDALONE_TOOLCHAIN=/absolute/path/to/android-toolchain
 #   $ mkdir build && cd build
 #   $ cmake -DCMAKE_TOOLCHAIN_FILE=path/to/the/android.toolchain.cmake ..
 #   $ make -j8
@@ -61,11 +55,6 @@
 #
 #  Options (can be set as cmake parameters: -D<option_name>=<value>):
 #    ANDROID_NDK=/opt/android-ndk - path to the NDK root.
-#      Can be set as environment variable. Can be set only at first cmake run.
-#
-#    ANDROID_STANDALONE_TOOLCHAIN=/opt/android-toolchain - path to the
-#      standalone toolchain. This option is not used if full NDK is found
-#      (ignored if ANDROID_NDK is set).
 #      Can be set as environment variable. Can be set only at first cmake run.
 #
 #    ANDROID_ABI=armeabi-v7a - specifies the target Application Binary
@@ -123,8 +112,8 @@
 #        * x86_64-clang3.5
 #
 #    ANDROID_FORCE_ARM_BUILD=OFF - set ON to generate 32-bit ARM instructions
-#      instead of Thumb. Is not available for "x86" (inapplicable) and
-#      "armeabi-v6 with VFP" (is forced to be ON) ABIs.
+#      instead of Thumb. Is not available for "armeabi-v6 with VFP"
+#      (is forced to be ON) ABI.
 #
 #    ANDROID_NO_UNDEFINED=ON - set ON to show all undefined symbols as linker
 #      errors even if they are not used.
@@ -132,13 +121,6 @@
 #    ANDROID_SO_UNDEFINED=OFF - set ON to allow undefined symbols in shared
 #      libraries. Automatically turned for NDK r5x and r6x due to GLESv2
 #      problems.
-#
-#    LIBRARY_OUTPUT_PATH_ROOT=${CMAKE_SOURCE_DIR} - where to output binary
-#      files. See additional details below.
-#
-#    ANDROID_SET_OBSOLETE_VARIABLES=ON - if set, then toolchain defines some
-#      obsolete variables which were used by previous versions of this file for
-#      backward compatibility.
 #
 #    ANDROID_STL=gnustl_static - specify the runtime to use.
 #
@@ -177,6 +159,10 @@
 #      chosen runtime. If disabled, then the user is responsible for settings
 #      these options.
 #
+#    ANDROID_SET_OBSOLETE_VARIABLES=OFF - if set, then toolchain defines some
+#      obsolete variables which were used by previous versions of this file for
+#      backward compatibility.
+#
 #  What?:
 #    android-cmake toolchain searches for NDK/toolchain in the following order:
 #      ANDROID_NDK - cmake parameter
@@ -199,12 +185,6 @@
 #    Also ARMEABI or ARMEABI_V7A or X86 or MIPS or ARM64_V8A or X86_64 or MIPS64
 #    will be set true, mutually exclusive. NEON option will be set true
 #    if VFP is set to NEON.
-#
-#    LIBRARY_OUTPUT_PATH_ROOT should be set in cache to determine where Android
-#    libraries will be installed.
-#    Default is ${CMAKE_SOURCE_DIR}, and the android libs will always be
-#    under the ${LIBRARY_OUTPUT_PATH_ROOT}/libs/${ANDROID_NDK_ABI_NAME}
-#    (depending on the target ABI). This is convenient for Android packaging.
 #
 # ------------------------------------------------------------------------------
 
@@ -1612,23 +1592,8 @@ macro( find_host_program )
 endmacro()
 
 
-macro( ANDROID_GET_ABI_RAWNAME TOOLCHAIN_FLAG VAR )
- if( "${TOOLCHAIN_FLAG}" STREQUAL "ARMEABI" )
-  set( ${VAR} "armeabi" )
- elseif( "${TOOLCHAIN_FLAG}" STREQUAL "ARMEABI_V7A" )
-  set( ${VAR} "armeabi-v7a" )
- elseif( "${TOOLCHAIN_FLAG}" STREQUAL "X86" )
-  set( ${VAR} "x86" )
- elseif( "${TOOLCHAIN_FLAG}" STREQUAL "MIPS" )
-  set( ${VAR} "mips" )
- else()
-  set( ${VAR} "unknown" )
- endif()
-endmacro()
-
-
 # export toolchain settings for the try_compile() command
-if( NOT PROJECT_NAME STREQUAL "CMAKE_TRY_COMPILE" )
+if( NOT _CMAKE_IN_TRY_COMPILE )
  set( __toolchain_config "")
  foreach( __var NDK_CCACHE  LIBRARY_OUTPUT_PATH_ROOT  ANDROID_FORBID_SYGWIN  ANDROID_SET_OBSOLETE_VARIABLES
                 ANDROID_NDK_HOST_X64
@@ -1678,7 +1643,7 @@ endif()
 
 
 # set some obsolete variables for backward compatibility
-set( ANDROID_SET_OBSOLETE_VARIABLES ON CACHE BOOL "Define obsolete Andrid-specific cmake variables" )
+set( ANDROID_SET_OBSOLETE_VARIABLES OFF CACHE BOOL "Define obsolete Andrid-specific cmake variables" )
 mark_as_advanced( ANDROID_SET_OBSOLETE_VARIABLES )
 if( ANDROID_SET_OBSOLETE_VARIABLES )
  set( ANDROID_API_LEVEL ${ANDROID_NATIVE_API_LEVEL} )
@@ -1700,23 +1665,16 @@ endif()
 #   ANDROID_RELRO : ON/OFF
 #   ANDROID_FORCE_ARM_BUILD : ON/OFF
 #   ANDROID_STL_FORCE_FEATURES : ON/OFF
-#   ANDROID_SET_OBSOLETE_VARIABLES : ON/OFF
+#   ANDROID_SET_OBSOLETE_VARIABLES : OFF/ON
 #   ANDROID_LIBM_PATH : path to libm.so (set to something like $(TOP)/out/target/product/<product_name>/obj/lib/libm.so) to workaround unresolved `sincos`
 # Can be set only at the first run:
-#   ANDROID_NDK
-#   ANDROID_STANDALONE_TOOLCHAIN
+#   ANDROID_NDK : path to your NDK install
+#   NDK_CCACHE : path to your ccache executable
 #   ANDROID_TOOLCHAIN_NAME : the NDK name of compiler toolchain
 #   ANDROID_NDK_HOST_X64 : try to use x86_64 toolchain (default for x64 host systems)
 #   ANDROID_NDK_LAYOUT : the inner NDK structure (RELEASE, LINARO, ANDROID)
 #   LIBRARY_OUTPUT_PATH_ROOT : <any valid path>
-#   NDK_CCACHE : <path to your ccache executable>
-# Obsolete:
-#   ANDROID_API_LEVEL : superseded by ANDROID_NATIVE_API_LEVEL
-#   ARM_TARGET : superseded by ANDROID_ABI
-#   ARM_TARGETS : superseded by ANDROID_ABI (can be set only)
-#   ANDROID_NDK_TOOLCHAIN_ROOT : superseded by ANDROID_STANDALONE_TOOLCHAIN (can be set only)
-#   ANDROID_USE_STLPORT : superseded by ANDROID_STL=stlport_static
-#   ANDROID_LEVEL : superseded by ANDROID_NATIVE_API_LEVEL (completely removed)
+#   ANDROID_STANDALONE_TOOLCHAIN
 #
 # Primary read-only variables:
 #   ANDROID : always TRUE
@@ -1730,7 +1688,6 @@ endif()
 #   X86_64 : TRUE if configured for x86_64
 #   MIPS : TRUE if configured for mips
 #   MIPS64 : TRUE if configured for mips64
-#   BUILD_ANDROID : always TRUE
 #   BUILD_WITH_ANDROID_NDK : TRUE if NDK is used
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
@@ -1762,6 +1719,5 @@ endif()
 #   ANDROID_DEFAULT_NDK_API_LEVEL
 #   ANDROID_DEFAULT_NDK_API_LEVEL_${ARCH}
 #   ANDROID_NDK_SEARCH_PATHS
-#   ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH
 #   ANDROID_SUPPORTED_ABIS_${ARCH}
 #   ANDROID_SUPPORTED_NDK_VERSIONS
