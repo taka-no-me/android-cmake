@@ -17,6 +17,15 @@ One-liner:
 
     cmake -DCMAKE_TOOLCHAIN_FILE=android.toolchain.cmake -DANDROID_NDK=<ndk_path> -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI="armeabi-v7a with NEON" <source_path> && cmake --build .
 
+_android-cmake_ will search for your NDK install in the following order:
+
+1. Value of `ANDROID_NDK` CMake variable;
+1. Value of `ANDROID_NDK` environment variable;
+1. All supported release names from newest to oldest under the every path in `ANDROID_NDK_SEARCH_PATHS` CMake variable;
+1. All supported release names from newest to oldest under the platform specific locations (including home folder and Windows "Program Files").
+
+So if you have installed the NDK as `~/android-ndk-r10d` then _android-cmake_ will locate it automatically.
+
 ## Getting started
 
 To build a cmake-based C/C++ project for Android you need:
@@ -43,6 +52,11 @@ So don't even try other targets that can be found in CMake documentation and don
 * GCC's stack protector is not used neither in `Debug` nor `Release` configurations;
 * No builds for multiple platforms (e.g. building for both arm and x86 require to run cmake twice with different parameters);
 * No file level Neon via `.neon` suffix;
+
+The following features of _ndk-build_ are not supported by the _android-cmake_ yet:
+
+* `armeabi-v7a-hard` ABI
+* `libc++_static`/`libc++_shared` STL runtime
 
 ## Basic options
 
@@ -181,6 +195,15 @@ However this will break regular builds so instead of wrapping package search int
         find_program(${ARGN})
       endmacro()
     endif()
+
+### Compiler flags recycling
+
+Make sure to do the following in your scripts:
+
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${my_cxx_flags}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${my_cxx_flags}")
+
+The flags will be prepopulated with critical flags, so don't loose them. Also be aware that _android-cmake_ also sets configuration-specific compiler and linker flags.
 
 ## Troubleshooting
 

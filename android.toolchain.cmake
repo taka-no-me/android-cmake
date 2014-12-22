@@ -215,22 +215,22 @@ endif()
 # this one not so much
 set( CMAKE_SYSTEM_VERSION 1 )
 
-# rpath makes low sence for Android
+# rpath makes low sense for Android
 set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
 # NDK search paths
 set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
-if(NOT DEFINED ANDROID_NDK_SEARCH_PATHS)
+if( NOT DEFINED ANDROID_NDK_SEARCH_PATHS )
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS "${ANDROID_NDK_SEARCH_PATHS}/android-ndk" "$ENV{SystemDrive}/NVPACK/android-ndk" )
+  set( ANDROID_NDK_SEARCH_PATHS "${ANDROID_NDK_SEARCH_PATHS}" "$ENV{SystemDrive}/NVPACK" )
  else()
   file( TO_CMAKE_PATH "$ENV{HOME}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS /opt/android-ndk "${ANDROID_NDK_SEARCH_PATHS}/NVPACK/android-ndk" )
+  set( ANDROID_NDK_SEARCH_PATHS /opt "${ANDROID_NDK_SEARCH_PATHS}/NVPACK" )
  endif()
 endif()
-if(NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH)
+if( NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
  set( ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH /opt/android-toolchain )
 endif()
 
@@ -409,7 +409,7 @@ if( NOT ANDROID_NDK )
   set( __ndkSearchPaths )
   foreach( __ndkSearchPath ${ANDROID_NDK_SEARCH_PATHS} )
    foreach( suffix ${ANDROID_SUPPORTED_NDK_VERSIONS} )
-    list( APPEND __ndkSearchPaths "${__ndkSearchPath}${suffix}" )
+    list( APPEND __ndkSearchPaths "${__ndkSearchPath}/android-ndk${suffix}" )
    endforeach()
   endforeach()
   __INIT_VARIABLE( ANDROID_NDK PATH VALUES ${__ndkSearchPaths} )
@@ -467,7 +467,7 @@ else()
     or
       export ANDROID_STANDALONE_TOOLCHAIN=~/my-android-toolchain
     or put the toolchain or NDK in the default path:
-      sudo ln -s ~/my-android-ndk ${ANDROID_NDK_SEARCH_PATH}
+      sudo ln -s ~/my-android-ndk ${ANDROID_NDK_SEARCH_PATH}/android-ndk
       sudo ln -s ~/my-android-toolchain ${ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH}" )
 endif()
 
