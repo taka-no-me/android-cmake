@@ -159,10 +159,6 @@
 #      chosen runtime. If disabled, then the user is responsible for settings
 #      these options.
 #
-#    ANDROID_SET_OBSOLETE_VARIABLES=OFF - if set, then toolchain defines some
-#      obsolete variables which were used by previous versions of this file for
-#      backward compatibility.
-#
 #  What?:
 #    android-cmake toolchain searches for NDK/toolchain in the following order:
 #      ANDROID_NDK - cmake parameter
@@ -252,106 +248,90 @@ set( ANDROID_DEFAULT_NDK_API_LEVEL_mips64 21 )
 
 
 macro( __LIST_FILTER listvar regex )
- if( ${listvar} )
-  foreach( __val ${${listvar}} )
-   if( __val MATCHES "${regex}" )
-    list( REMOVE_ITEM ${listvar} "${__val}" )
-   endif()
-  endforeach()
- endif()
+  if( ${listvar} )
+    foreach( __val ${${listvar}} )
+      if( __val MATCHES "${regex}" )
+        list( REMOVE_ITEM ${listvar} "${__val}" )
+      endif()
+    endforeach()
+  endif()
 endmacro()
 
 macro( __INIT_VARIABLE var_name )
- set( __test_path 0 )
- foreach( __var ${ARGN} )
-  if( __var STREQUAL "PATH" )
-   set( __test_path 1 )
-   break()
-  endif()
- endforeach()
- if( __test_path AND NOT EXISTS "${${var_name}}" )
-  unset( ${var_name} CACHE )
- endif()
- if( "${${var_name}}" STREQUAL "" )
-  set( __values 0 )
+  set( __test_path 0 )
   foreach( __var ${ARGN} )
-   if( __var STREQUAL "VALUES" )
-    set( __values 1 )
-   elseif( NOT __var STREQUAL "PATH" )
-    set( __obsolete 0 )
-    if( __var MATCHES "^OBSOLETE_.*$" )
-     string( REPLACE "OBSOLETE_" "" __var "${__var}" )
-     set( __obsolete 1 )
-    endif()
-    if( __var MATCHES "^ENV_.*$" )
-     string( REPLACE "ENV_" "" __var "${__var}" )
-     set( __value "$ENV{${__var}}" )
-    elseif( DEFINED ${__var} )
-     set( __value "${${__var}}" )
-    else()
-     if( __values )
-      set( __value "${__var}" )
-     else()
-      set( __value "" )
-     endif()
-    endif()
-    if( NOT "${__value}" STREQUAL "" )
-     if( __test_path )
-      if( EXISTS "${__value}" )
-       file( TO_CMAKE_PATH "${__value}" ${var_name} )
-       if( __obsolete AND NOT _CMAKE_IN_TRY_COMPILE )
-        message( WARNING "Using value of obsolete variable ${__var} as initial value for ${var_name}. Please note, that ${__var} can be completely removed in future versions of the toolchain." )
-       endif()
-       break()
-      endif()
-     else()
-      set( ${var_name} "${__value}" )
-       if( __obsolete AND NOT _CMAKE_IN_TRY_COMPILE )
-        message( WARNING "Using value of obsolete variable ${__var} as initial value for ${var_name}. Please note, that ${__var} can be completely removed in future versions of the toolchain." )
-       endif()
+    if( __var STREQUAL "PATH" )
+      set( __test_path 1 )
       break()
-     endif()
     endif()
-   endif()
   endforeach()
-  unset( __value )
-  unset( __values )
-  unset( __obsolete )
- elseif( __test_path )
-  file( TO_CMAKE_PATH "${${var_name}}" ${var_name} )
- endif()
- unset( __test_path )
+
+  if( __test_path AND NOT EXISTS "${${var_name}}" )
+    unset( ${var_name} CACHE )
+  endif()
+
+  if( " ${${var_name}}" STREQUAL " " )
+    set( __values 0 )
+    foreach( __var ${ARGN} )
+      if( __var STREQUAL "VALUES" )
+        set( __values 1 )
+      elseif( NOT __var STREQUAL "PATH" )
+        if( __var MATCHES "^ENV_.*$" )
+          string( REPLACE "ENV_" "" __var "${__var}" )
+          set( __value "$ENV{${__var}}" )
+        elseif( DEFINED ${__var} )
+          set( __value "${${__var}}" )
+        elseif( __values )
+          set( __value "${__var}" )
+        else()
+          set( __value "" )
+        endif()
+
+        if( NOT " ${__value}" STREQUAL " " AND (NOT __test_path OR EXISTS "${__value}") )
+          set( ${var_name} "${__value}" )
+          break()
+        endif()
+      endif()
+    endforeach()
+    unset( __value )
+    unset( __values )
+  endif()
+
+  if( __test_path )
+    file( TO_CMAKE_PATH "${${var_name}}" ${var_name} )
+  endif()
+  unset( __test_path )
 endmacro()
 
 macro( __DETECT_NATIVE_API_LEVEL _var _path )
- SET( __ndkApiLevelRegex "^[\t ]*#define[\t ]+__ANDROID_API__[\t ]+([0-9]+)[\t ]*.*$" )
- FILE( STRINGS ${_path} __apiFileContent REGEX "${__ndkApiLevelRegex}" )
- if( NOT __apiFileContent )
-  message( SEND_ERROR "Could not get Android native API level. Probably you have specified invalid level value, or your copy of NDK/toolchain is broken." )
- endif()
- string( REGEX REPLACE "${__ndkApiLevelRegex}" "\\1" ${_var} "${__apiFileContent}" )
- unset( __apiFileContent )
- unset( __ndkApiLevelRegex )
+  set( __ndkApiLevelRegex "^[\t ]*#define[\t ]+__ANDROID_API__[\t ]+([0-9]+)[\t ]*.*$" )
+  file( STRINGS ${_path} __apiFileContent REGEX "${__ndkApiLevelRegex}" )
+  if( NOT __apiFileContent )
+    message( SEND_ERROR "Could not get Android native API level. Probably you have specified invalid level value, or your copy of NDK/toolchain is broken." )
+  endif()
+  string( REGEX REPLACE "${__ndkApiLevelRegex}" "\\1" ${_var} "${__apiFileContent}" )
+  unset( __apiFileContent )
+  unset( __ndkApiLevelRegex )
 endmacro()
 
 macro( __DETECT_TOOLCHAIN_MACHINE_NAME _var _root )
  if( EXISTS "${_root}" )
-  file( GLOB __gccExePath RELATIVE "${_root}/bin/" "${_root}/bin/*-gcc${TOOL_OS_SUFFIX}" )
-  __LIST_FILTER( __gccExePath "^[.].*" )
-  list( LENGTH __gccExePath __gccExePathsCount )
-  if( NOT __gccExePathsCount EQUAL 1  AND NOT _CMAKE_IN_TRY_COMPILE )
-   message( WARNING "Could not determine machine name for compiler from ${_root}" )
-   set( ${_var} "" )
+    file( GLOB __gccExePath RELATIVE "${_root}/bin/" "${_root}/bin/*-gcc${TOOL_OS_SUFFIX}" )
+    __LIST_FILTER( __gccExePath "^[.].*" )
+    list( LENGTH __gccExePath __gccExePathsCount )
+    if( NOT __gccExePathsCount EQUAL 1  AND NOT _CMAKE_IN_TRY_COMPILE )
+      message( WARNING "Could not determine machine name for compiler from ${_root}" )
+      set( ${_var} "" )
+    else()
+      get_filename_component( __gccExeName "${__gccExePath}" NAME_WE )
+      string( REPLACE "-gcc" "" ${_var} "${__gccExeName}" )
+    endif()
+    unset( __gccExePath )
+    unset( __gccExePathsCount )
+    unset( __gccExeName )
   else()
-   get_filename_component( __gccExeName "${__gccExePath}" NAME_WE )
-   string( REPLACE "-gcc" "" ${_var} "${__gccExeName}" )
+    set( ${_var} "" )
   endif()
-  unset( __gccExePath )
-  unset( __gccExePathsCount )
-  unset( __gccExeName )
- else()
-  set( ${_var} "" )
- endif()
 endmacro()
 
 
@@ -402,7 +382,7 @@ endif()
 __INIT_VARIABLE( ANDROID_NDK PATH ENV_ANDROID_NDK )
 if( NOT ANDROID_NDK )
  # see if we have path to Android standalone toolchain
- __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ENV_ANDROID_STANDALONE_TOOLCHAIN OBSOLETE_ANDROID_NDK_TOOLCHAIN_ROOT OBSOLETE_ENV_ANDROID_NDK_TOOLCHAIN_ROOT )
+ __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ENV_ANDROID_STANDALONE_TOOLCHAIN )
 
  if( NOT ANDROID_STANDALONE_TOOLCHAIN )
   #try to find Android NDK in one of the the default locations
@@ -649,7 +629,7 @@ if( NOT ANDROID_SUPPORTED_ABIS )
 endif()
 
 # choose target ABI
-__INIT_VARIABLE( ANDROID_ABI OBSOLETE_ARM_TARGET OBSOLETE_ARM_TARGETS VALUES ${ANDROID_SUPPORTED_ABIS} )
+__INIT_VARIABLE( ANDROID_ABI VALUES ${ANDROID_SUPPORTED_ABIS} )
 # verify that target ABI is supported
 list( FIND ANDROID_SUPPORTED_ABIS "${ANDROID_ABI}" __androidAbiIdx )
 if( __androidAbiIdx EQUAL -1 )
@@ -740,7 +720,7 @@ if( CMAKE_BINARY_DIR AND EXISTS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMa
 endif()
 
 if( ANDROID_ARCH_NAME STREQUAL "arm" AND NOT ARMEABI_V6 )
- __INIT_VARIABLE( ANDROID_FORCE_ARM_BUILD OBSOLETE_FORCE_ARM VALUES OFF )
+ __INIT_VARIABLE( ANDROID_FORCE_ARM_BUILD VALUES OFF )
  set( ANDROID_FORCE_ARM_BUILD ${ANDROID_FORCE_ARM_BUILD} CACHE BOOL "Use 32-bit ARM instructions instead of Thumb-1" FORCE )
  mark_as_advanced( ANDROID_FORCE_ARM_BUILD )
 else()
@@ -844,16 +824,7 @@ endif()
 
 # runtime choice (STL, rtti, exceptions)
 if( NOT ANDROID_STL )
- # honor legacy ANDROID_USE_STLPORT
- if( DEFINED ANDROID_USE_STLPORT )
-  if( ANDROID_USE_STLPORT )
-   set( ANDROID_STL stlport_static )
-  endif()
-  message( WARNING "You are using an obsolete variable ANDROID_USE_STLPORT to select the STL variant. Use -DANDROID_STL=stlport_static instead." )
- endif()
- if( NOT ANDROID_STL )
   set( ANDROID_STL gnustl_static )
- endif()
 endif()
 set( ANDROID_STL "${ANDROID_STL}" CACHE STRING "C++ runtime" )
 set( ANDROID_STL_FORCE_FEATURES ON CACHE BOOL "automatically configure rtti and exceptions support based on C++ runtime" )
@@ -1329,7 +1300,7 @@ if( ANDROID_NDK_RELEASE_NUM LESS 7000 ) # before r7
 else()
  __INIT_VARIABLE( ANDROID_SO_UNDEFINED                      VALUES OFF )
 endif()
-__INIT_VARIABLE( ANDROID_NO_UNDEFINED OBSOLETE_NO_UNDEFINED VALUES ON )
+__INIT_VARIABLE( ANDROID_NO_UNDEFINED                       VALUES ON )
 __INIT_VARIABLE( ANDROID_FUNCTION_LEVEL_LINKING             VALUES ON )
 __INIT_VARIABLE( ANDROID_GOLD_LINKER                        VALUES ON )
 __INIT_VARIABLE( ANDROID_NOEXECSTACK                        VALUES ON )
@@ -1600,7 +1571,7 @@ endmacro()
 # export toolchain settings for the try_compile() command
 if( NOT _CMAKE_IN_TRY_COMPILE )
  set( __toolchain_config "")
- foreach( __var NDK_CCACHE  LIBRARY_OUTPUT_PATH_ROOT  ANDROID_FORBID_SYGWIN  ANDROID_SET_OBSOLETE_VARIABLES
+ foreach( __var NDK_CCACHE  LIBRARY_OUTPUT_PATH_ROOT  ANDROID_FORBID_SYGWIN
                 ANDROID_NDK_HOST_X64
                 ANDROID_NDK
                 ANDROID_NDK_LAYOUT
@@ -1647,16 +1618,6 @@ if( CMAKE_GENERATOR MATCHES "Ninja" AND CMAKE_HOST_WIN32 )
 endif()
 
 
-# set some obsolete variables for backward compatibility
-set( ANDROID_SET_OBSOLETE_VARIABLES OFF CACHE BOOL "Define obsolete Andrid-specific cmake variables" )
-mark_as_advanced( ANDROID_SET_OBSOLETE_VARIABLES )
-if( ANDROID_SET_OBSOLETE_VARIABLES )
- set( ANDROID_API_LEVEL ${ANDROID_NATIVE_API_LEVEL} )
- set( ARM_TARGET "${ANDROID_ABI}" )
- set( ARMEABI_NDK_NAME "${ANDROID_NDK_ABI_NAME}" )
-endif()
-
-
 # Variables controlling behavior or set by cmake toolchain:
 #   ANDROID_ABI : "armeabi-v7a" (default), "armeabi", "armeabi-v7a with NEON", "armeabi-v7a with VFPV3", "armeabi-v6 with VFP", "x86", "mips", "arm64-v8a", "x86_64", "mips64"
 #   ANDROID_NATIVE_API_LEVEL : 3,4,5,8,9,14,15,16,17,18,19,21 (depends on NDK version)
@@ -1670,7 +1631,6 @@ endif()
 #   ANDROID_RELRO : ON/OFF
 #   ANDROID_FORCE_ARM_BUILD : ON/OFF
 #   ANDROID_STL_FORCE_FEATURES : ON/OFF
-#   ANDROID_SET_OBSOLETE_VARIABLES : OFF/ON
 #   ANDROID_LIBM_PATH : path to libm.so (set to something like $(TOP)/out/target/product/<product_name>/obj/lib/libm.so) to workaround unresolved `sincos`
 # Can be set only at the first run:
 #   ANDROID_NDK : path to your NDK install
@@ -1703,8 +1663,6 @@ endif()
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
 #   ANDROID_COMPILER_IS_CLANG : TRUE if clang compiler is used
-# Obsolete:
-#   ARMEABI_NDK_NAME : superseded by ANDROID_NDK_ABI_NAME
 #
 # Secondary (less stable) read-only variables:
 #   ANDROID_COMPILER_VERSION : GCC version used (not Clang version)
