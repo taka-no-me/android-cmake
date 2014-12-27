@@ -21,8 +21,8 @@ _android-cmake_ will search for your NDK install in the following order:
 
 1. Value of `ANDROID_NDK` CMake variable;
 1. Value of `ANDROID_NDK` environment variable;
-1. All supported release names from newest to oldest under the every path in `ANDROID_NDK_SEARCH_PATHS` CMake variable;
-1. All supported release names from newest to oldest under the platform specific locations (including home folder and Windows "Program Files").
+1. Search under paths from `ANDROID_NDK_SEARCH_PATHS` CMake variable;
+1. Search platform specific locations (home folder, Windows "Program Files", etc).
 
 So if you have installed the NDK as `~/android-ndk-r10d` then _android-cmake_ will locate it automatically.
 
@@ -48,7 +48,8 @@ So don't even try other targets that can be found in CMake documentation and don
 
 * Latest GCC available in NDK is used as the default compiler;
 * `Release` builds with `-O3` instead of `-Os`;
-* `Release` builds without debug info (because _ndk-build_ always creates a stripped version but cmake delays this for `install`);
+* `Release` builds without debug info (without `-g`) (because _ndk-build_ always creates a stripped version but cmake delays this for `install/strip` target);
+* `-fsigned-char` is added to compiler flags to make `char` signed by default as it is on x86/x86_64;
 * GCC's stack protector is not used neither in `Debug` nor `Release` configurations;
 * No builds for multiple platforms (e.g. building for both arm and x86 require to run cmake twice with different parameters);
 * No file level Neon via `.neon` suffix;
@@ -126,14 +127,14 @@ Normally _android-cmake_ users are not supposed to touch these variables but the
 * **ANDROID_FORCE_ARM_BUILD** = `OFF` - generate 32-bit ARM instructions instead of Thumb. Applicable only for arm ABIs and is forced to be `ON` for `armeabi-v6 with VFP`;
 * **ANDROID_NO_UNDEFINED** = `ON` - show all undefined symbols as linker errors;
 * **ANDROID_SO_UNDEFINED** = `OFF` - allow undefined symbols in shared libraries;
-    * actually id `ON` by default for NDK older than r7
+    * actually it is turned `ON` by default for NDK older than `r7`
 * **ANDROID_STL_FORCE_FEATURES** = `ON` - automatically configure rtti and exceptions support based on C++ runtime;
 * **ANDROID_NDK_LAYOUT** = `RELEASE` - inner layout of Android NDK, should be detected automatically. Possible values are:
     * `RELEASE` - public releases from Google;
     * `LINARO` - NDK from Linaro project;
     * `ANDROID` - NDK from AOSP.
 * **ANDROID_FUNCTION_LEVEL_LINKING** = `ON` - enables saparate putting each function and data items into separate sections and enable garbage collection of unused input sections at link time (`-fdata-sections -ffunction-sections -Wl,--gc-sections`);
-* **ANDROID_GOLD_LINKER** = `ON` - use gold linker for NDK r8b and newer (only for ARM and x86);
+* **ANDROID_GOLD_LINKER** = `ON` - use gold linker with GCC 4.6 for NDK r8b and newer (only for ARM and x86);
 * **ANDROID_NOEXECSTACK** = `ON` - enables or disables stack execution protection code (`-Wl,-z,noexecstack`);
 * **ANDROID_RELRO** = `ON` - Enables RELRO - a memory corruption mitigation technique (`-Wl,-z,relro -Wl,-z,now`);
 * **ANDROID_LIBM_PATH** - path to `libm.so` (set to something like `$(TOP)/out/target/product/<product_name>/obj/lib/libm.so`) to workaround unresolved `sincos`.
@@ -209,7 +210,7 @@ The flags will be prepopulated with critical flags, so don't loose them. Also be
 
 ### Building on Windows
 
-First of all `cygwin` builds are **NOT supported** and will not be supported by _android-cmake_. To build natively on Widows you need a port of make but I recommend http://martine.github.io/ninja/ instead.
+First of all `cygwin` builds are **NOT supported** and will not be supported by _android-cmake_. To build natively on Windows you need a port of make but I recommend http://martine.github.io/ninja/ instead.
 
 To build with Ninja you need:
 
