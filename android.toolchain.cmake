@@ -1609,14 +1609,23 @@ endif()
 
 # force cmake to produce / instead of \ in build commands for Ninja generator
 if( CMAKE_GENERATOR MATCHES "Ninja" AND CMAKE_HOST_WIN32 )
- # it is a bad hack after all
- # CMake generates Ninja makefiles with UNIX paths only if it thinks that we are going to build with MinGW
- set( CMAKE_COMPILER_IS_MINGW TRUE ) # tell CMake that we are MinGW
- set( CMAKE_CROSSCOMPILING TRUE )    # stop recursion
- enable_language( C )
- enable_language( CXX )
- # unset( CMAKE_COMPILER_IS_MINGW ) # can't unset because CMake does not convert back-slashes in response files without it
- unset( MINGW )
+  # it is a bad hack after all
+  # CMake generates Ninja makefiles with UNIX paths only if it thinks that we are going to build with MinGW
+  set( CMAKE_COMPILER_IS_MINGW TRUE ) # tell CMake that we are MinGW
+  set( CMAKE_CROSSCOMPILING TRUE )    # stop recursion
+  enable_language( C )
+  enable_language( CXX )
+  unset( MINGW )
+
+  # can't just unset CMAKE_COMPILER_IS_MINGW because CMake does not convert back-slashes in response files without it
+  unset( CMAKE_COMPILER_IS_MINGW )
+  # see http://www.cmake.org/Bug/view.php?id=14195 for details
+  macro( __android_end_of_configure_hook var access value )
+    if( "${value}" STREQUAL "" )
+      set( CMAKE_COMPILER_IS_MINGW TRUE )
+    endif()
+  endmacro()
+  variable_watch( CMAKE_CURRENT_LIST_DIR __android_end_of_configure_hook )
 endif()
 
 
