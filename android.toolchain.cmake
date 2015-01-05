@@ -187,19 +187,314 @@
 cmake_minimum_required( VERSION 2.6.3 )
 
 if( DEFINED CMAKE_CROSSCOMPILING )
- # subsequent toolchain loading is not really needed
- return()
+  # regular projects do not expect any changes if the toolchain file is loaded second time
+  # and we also use this to stop endless recursive loads
+  return()
 endif()
 
+
+# defaults
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+# known ABIs
+set( ANDROID_SUPPORTED_ABIS_arm    "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
+set( ANDROID_SUPPORTED_ABIS_arm64  "arm64-v8a" )
+set( ANDROID_SUPPORTED_ABIS_x86    "x86" )
+set( ANDROID_SUPPORTED_ABIS_x86_64 "x86_64" )
+set( ANDROID_SUPPORTED_ABIS_mips   "mips" )
+set( ANDROID_SUPPORTED_ABIS_mips64 "mips64" )
+# API level defaults
+set( ANDROID_DEFAULT_NDK_API_LEVEL         8 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL_arm64  21 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL_x86     9 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL_x86_64 21 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL_mips    9 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL_mips64 21 )
+
+
+# touch toolchain variable to suppress "unused variable" warning
 if( CMAKE_TOOLCHAIN_FILE )
- # touch toolchain variable to suppress "unused variable" warning
 endif()
 
-# inherit settings in recursive loads
+
+# different cmake versions use different path for configuration files cache
+if( NOT DEFINED CMAKE_PLATFORM_INFO_DIR )
+  set( CMAKE_PLATFORM_INFO_DIR "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}" )
+endif()
+
+
+# inherit settings in subprojects created by try_compile
 get_property( _CMAKE_IN_TRY_COMPILE GLOBAL PROPERTY IN_TRY_COMPILE )
 if( _CMAKE_IN_TRY_COMPILE )
- include( "${CMAKE_CURRENT_SOURCE_DIR}/../android.toolchain.config.cmake" OPTIONAL )
+  if( CMAKE_VERSION VERSION_GREATER "2.8.9" )
+    include( "${CMAKE_PLATFORM_INFO_DIR}/android.toolchain.config.cmake" OPTIONAL )
+  else()
+    include( "${CMAKE_CURRENT_SOURCE_DIR}/../android.toolchain.config.cmake" OPTIONAL )
+  endif()
 endif()
+
+
+# helper macro to remove all matching items from list
+macro( __LIST_FILTER listvar regex )
+  if( ${listvar} )
+    foreach( __val ${${listvar}} )
+      if( __val MATCHES "${regex}" )
+        list( REMOVE_ITEM ${listvar} "${__val}" )
+      endif()
+    endforeach()
+  endif()
+endmacro()
+
+
+# helper function to issue a fatal error - it is not as simple to do from a toolchain as it is expected to be
+function( __android_fatal_error )
+  # quiet missing C/CXX enviromnent variables names
+  set( CMAKE_GENERATOR_NO_COMPILER_ENV 1 PARENT_SCOPE )
+  # quiet missing C/CXX compiler variables
+  if( NOT CMAKE_CXX_COMPILER )
+    set( CMAKE_CXX_COMPILER "${CMAKE_COMMAND}" PARENT_SCOPE )
+  endif()
+  if( NOT CMAKE_C_COMPILER )
+    set( CMAKE_C_COMPILER "${CMAKE_COMMAND}" PARENT_SCOPE )
+  endif()
+  # quiet "Could not find cmake module file" errors
+  if( NOT EXISTS "${CMAKE_PLATFORM_INFO_DIR}" )
+    execute_process( COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_PLATFORM_INFO_DIR}" )
+  endif()
+  execute_process( COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_PLATFORM_INFO_DIR}/CMakeCXXCompiler.cmake" )
+  execute_process( COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_PLATFORM_INFO_DIR}/CMakeCCompiler.cmake" )
+
+  message( FATAL_ERROR "\n" ${ARGN} "\n\n" )
+endfunction()
+
+
+# recover from NDK or toolchain search failure (however it is better to do a clean build)
+if( NOT CMAKE_AR AND NOT _CMAKE_IN_TRY_COMPILE )
+  unset( CMAKE_C_COMPILER CACHE )
+  unset( CMAKE_CXX_COMPILER CACHE )
+  execute_process( COMMAND "${CMAKE_COMMAND}" -E remove
+      "${CMAKE_PLATFORM_INFO_DIR}/CMakeCXXCompiler.cmake"
+      "${CMAKE_PLATFORM_INFO_DIR}/CMakeCCompiler.cmake"
+      "${CMAKE_PLATFORM_INFO_DIR}/CMakeSystem.cmake" )
+endif()
+
+
+# fight against cygwin
+set( ANDROID_FORBID_SYGWIN TRUE CACHE BOOL "Prevent cmake from working under cygwin and using cygwin tools")
+mark_as_advanced( ANDROID_FORBID_SYGWIN )
+if( ANDROID_FORBID_SYGWIN )
+  if( CYGWIN )
+    __android_fatal_error( "Android NDK and android-cmake toolchain are not welcome Cygwin. It is unlikely that this cmake toolchain will work under cygwin. But if you want to try then you can set cmake variable ANDROID_FORBID_SYGWIN to FALSE and rerun cmake." )
+  endif()
+
+  if( CMAKE_HOST_WIN32 )
+    # remove cygwin from PATH
+    set( __new_path "$ENV{PATH}")
+    __LIST_FILTER( __new_path "cygwin" )
+    set(ENV{PATH} "${__new_path}")
+    unset(__new_path)
+  endif()
+endif()
+
+
+# find the NDK to build with
+# 1) check ANDROID_NDK cmake variable, issue error if set to invalid value
+if( DEFINED ANDROID_NDK)
+  file( TO_CMAKE_PATH "${ANDROID_NDK}" ANDROID_NDK )
+  if( NOT EXISTS "${ANDROID_NDK}/ndk-build" )
+    __android_fatal_error( "The specified value of ANDROID_NDK is pointing either to non-existing or invalid location: ANDROID_NDK=${ANDROID_NDK}" )
+  endif()
+endif()
+
+# 2) check ANDROID_NDK environment variable
+if( NOT ANDROID_NDK AND NOT ANDROID_STANDALONE_TOOLCHAIN )
+  file( TO_CMAKE_PATH "$ENV{ANDROID_NDK}" ANDROID_NDK )
+  if( ANDROID_NDK AND NOT EXISTS "${ANDROID_NDK}/ndk-build" )
+    __android_fatal_error( "The ANDROID_NDK environment variable is pointing either to non-existing or invalid location: ANDROID_NDK=${ANDROID_NDK}" )
+  endif()
+endif()
+
+# 3) look if ndk-build is in PATH, use its location if found
+if( NOT ANDROID_NDK AND NOT ANDROID_STANDALONE_TOOLCHAIN )
+  find_program( ANDROID_NDK_BUILD ndk-build )
+  if( ANDROID_NDK_BUILD )
+    get_filename_component( ANDROID_NDK "${ANDROID_NDK_BUILD}" PATH )
+    message( STATUS "Found Android NDK at ${ANDROID_NDK} (found based on ndk-build location)\n\tIf you want to build with another NDK then define a cmake or environment variable: ANDROID_NDK" )
+  endif()
+  unset( ANDROID_NDK_BUILD CACHE )
+endif()
+
+# 4) search android-ndk-* under paths from ANDROID_NDK_SEARCH_PATHS
+# 5) search android-ndk-* under OS specific paths
+if( NOT ANDROID_NDK AND NOT ANDROID_STANDALONE_TOOLCHAIN )
+  if( CMAKE_HOST_WIN32 )
+    list( APPEND ANDROID_NDK_SEARCH_PATHS "$ENV{PROGRAMFILES}" "$ENV{SystemDrive}/NVPACK" )
+  else()
+    list( APPEND ANDROID_NDK_SEARCH_PATHS "$ENV{HOME}" "/opt" "$ENV{HOME}/NVPACK" )
+  endif()
+
+  foreach( __ndkSearchPath ${ANDROID_NDK_SEARCH_PATHS} )
+    file( TO_CMAKE_PATH "${__ndkSearchPath}" __ndkSearchPath )
+    foreach( suffix ${ANDROID_SUPPORTED_NDK_VERSIONS} )
+      if( EXISTS "${__ndkSearchPath}/android-ndk${suffix}/ndk-build" )
+        set( ANDROID_NDK "${__ndkSearchPath}/android-ndk${suffix}" )
+        message( STATUS "Found Android NDK at ${ANDROID_NDK}\n\tIf you want to build with another NDK then define a cmake or environment variable: ANDROID_NDK" )
+        break()
+      endif()
+    endforeach()
+    if( ANDROID_NDK )
+      break()
+    endif()
+  endforeach()
+  unset( __ndkSearchPath )
+endif()
+
+# 6) what if we have path to Android standalone toolchain
+if( NOT ANDROID_NDK )
+  if( ANDROID_STANDALONE_TOOLCHAIN )
+    file( TO_CMAKE_PATH "${ANDROID_STANDALONE_TOOLCHAIN}" ANDROID_STANDALONE_TOOLCHAIN )
+    if( NOT EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}" )
+      __android_fatal_error( "The specified value of ANDROID_STANDALONE_TOOLCHAIN is pointing either to non-existing location: ANDROID_STANDALONE_TOOLCHAIN=${ANDROID_STANDALONE_TOOLCHAIN}" )
+    endif()
+  endif()
+
+  if( NOT ANDROID_STANDALONE_TOOLCHAIN )
+    file( TO_CMAKE_PATH "$ENV{ANDROID_STANDALONE_TOOLCHAIN}" ANDROID_STANDALONE_TOOLCHAIN )
+    if( NOT EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}" )
+      __android_fatal_error( "The ANDROID_STANDALONE_TOOLCHAIN environment variable is pointing either to non-existing location: ANDROID_STANDALONE_TOOLCHAIN=${ANDROID_STANDALONE_TOOLCHAIN}" )
+    endif()
+  endif()
+
+  if( NOT ANDROID_STANDALONE_TOOLCHAIN )
+    foreach( __toolchainSearchPath ${ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH} "/opt/android-toolchain" )
+      file( TO_CMAKE_PATH "${__toolchainSearchPath}" __toolchainSearchPath )
+      if( EXISTS "${__toolchainSearchPath}" )
+        set( ANDROID_STANDALONE_TOOLCHAIN "${__toolchainSearchPath}" )
+        break()
+    endif()
+    unset( __toolchainSearchPath )
+  endif()
+endif()
+
+# fail if still nothing found
+if( NOT ANDROID_NDK AND NOT ANDROID_STANDALONE_TOOLCHAIN )
+  list(GET ANDROID_NDK_SEARCH_PATHS 0 ANDROID_NDK_SEARCH_PATH)
+  file( TO_CMAKE_PATH "${ANDROID_NDK_SEARCH_PATH}" ANDROID_NDK_SEARCH_PATH )
+  __android_fatal_error( "Could not Android NDK
+    You should either provide path to NDK as a cmake variable:
+        cmake -DANDROID_NDK=~/my-android-ndk
+    or set it as an environment variable:
+        export ANDROID_NDK=~/my-android-ndk
+    or put NDK to the default search path:
+        sudo ln -s ~/my-android-ndk \"${ANDROID_NDK_SEARCH_PATH}/android-ndk\"" )
+endif()
+
+
+# remember found paths
+if( ANDROID_NDK )
+  get_filename_component( ANDROID_NDK "${ANDROID_NDK}" ABSOLUTE )
+  set( ANDROID_NDK "${ANDROID_NDK}" CACHE INTERNAL "Location of the Android NDK" FORCE )
+  set( BUILD_WITH_ANDROID_NDK True )
+
+  # find NDK release name
+  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT" )
+    file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX "r[0-9]+[a-z]?" )
+    string( REGEX MATCH "r([0-9]+)([a-z]?)" ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
+  else()
+    set( ANDROID_NDK_RELEASE "r1x" )
+    set( ANDROID_NDK_RELEASE_FULL "unreleased" )
+  endif()
+
+  # construct NDK numeric version
+  string( REGEX REPLACE "r([0-9]+)([a-z]?)" "\\1*1000" ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE}" )
+  if( CMAKE_VERSION VERSION_GREATER 2.8.4 )
+    string( FIND " abcdefghijklmnopqastuvwxyz" "${CMAKE_MATCH_2}" __ndkReleaseLetterNum )
+  else()
+    set( __ndkReleaseLetterNum 0 )
+    foreach( letter "" "a" "b" "c" "d" "e" "f" "g" )
+      if( letter STREQUAL CMAKE_MATCH_2 )
+        break()
+      endif()
+      set( __ndkReleaseLetterNum "${__ndkReleaseLetterNum}+1" )
+    endforeach()
+  endif()
+  math( EXPR ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE_NUM}+${__ndkReleaseLetterNum}" )
+elseif( ANDROID_STANDALONE_TOOLCHAIN )
+  get_filename_component( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" ABSOLUTE )
+  set( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" CACHE INTERNAL "Location of the Android standalone toolchain" FORCE )
+  set( BUILD_WITH_STANDALONE_TOOLCHAIN True )
+endif()
+
+
+# find current host platform name (NDK names them this  way)
+set( TOOL_OS_SUFFIX "" )
+if( CMAKE_HOST_APPLE )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME "darwin-x86_64" )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME32 "darwin-x86" )
+elseif( CMAKE_HOST_WIN32 )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME "windows-x86_64" )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME32 "windows" )
+  set( TOOL_OS_SUFFIX ".exe" )
+elseif( CMAKE_HOST_UNIX )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME "linux-x86_64" )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME32 "linux-x86" )
+else()
+  message( FATAL_ERROR "Cross-compilation on your platform is not supported by this CMake toolchain" )
+endif()
+
+
+# prefer 64-bit tools on 64-bit host
+set( ANDROID_NDK_HOST_X64 TRUE CACHE BOOL "Prefer 64-bit compiler toolchain (it is bitness of tools, to target platform)" )
+mark_as_advanced( ANDROID_NDK_HOST_X64 )
+if( NOT ANDROID_NDK_HOST_X64 )
+  set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME32} )
+endif()
+
+
+# detect android NDK layout
+if( BUILD_WITH_ANDROID_NDK )
+  if( NOT DEFINED ANDROID_NDK_LAYOUT )
+    # try to automatically detect the layout
+    if( EXISTS "${ANDROID_NDK}/RELEASE.TXT")
+      set( ANDROID_NDK_LAYOUT "RELEASE" )
+    elseif( EXISTS "${ANDROID_NDK}/../../linux-x86/toolchain/" )
+      set( ANDROID_NDK_LAYOUT "LINARO" )
+    elseif( EXISTS "${ANDROID_NDK}/../../gcc/" )
+      set( ANDROID_NDK_LAYOUT "ANDROID" )
+    endif()
+  endif()
+  set( ANDROID_NDK_LAYOUT "${ANDROID_NDK_LAYOUT}" CACHE STRING "The inner layout of NDK" )
+  mark_as_advanced( ANDROID_NDK_LAYOUT )
+
+  if( ANDROID_NDK_LAYOUT STREQUAL "LINARO" )
+    set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME32} ) # only 32-bit at the moment
+    set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/../../${ANDROID_NDK_HOST_SYSTEM_NAME}/toolchain" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH   "" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH32 "" )
+  elseif( ANDROID_NDK_LAYOUT STREQUAL "ANDROID" )
+    set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME32} ) # only 32-bit at the moment
+    set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/../../gcc/${ANDROID_NDK_HOST_SYSTEM_NAME}/arm" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH   "" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH32 "" )
+  else() # ANDROID_NDK_LAYOUT STREQUAL "RELEASE"
+    set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/toolchains" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH   "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
+    set( ANDROID_NDK_TOOLCHAINS_SUBPATH32 "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME32}" )
+  endif()
+  get_filename_component( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK_TOOLCHAINS_PATH}" ABSOLUTE )
+
+  # try to detect change of NDK
+  if( CMAKE_AR )
+    string( LENGTH "${ANDROID_NDK_TOOLCHAINS_PATH}" __length )
+    string( SUBSTRING "${CMAKE_AR}" 0 ${__length} __androidNdkPreviousPath )
+    if( NOT __androidNdkPreviousPath STREQUAL ANDROID_NDK_TOOLCHAINS_PATH )
+      __android_fatal_error("It is not possible to change the path to the NDK on subsequent CMake run. You must remove all generated files from your build folder before changing NDK location" )
+    endif()
+    unset( __androidNdkPreviousPath )
+    unset( __length )
+  endif()
+endif()
+
+
 
 # this one is important
 if( CMAKE_VERSION VERSION_GREATER "3.0.99" )
@@ -214,48 +509,6 @@ set( CMAKE_SYSTEM_VERSION 1 )
 # rpath makes low sense for Android
 set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
-
-# NDK search paths
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
-if( NOT DEFINED ANDROID_NDK_SEARCH_PATHS )
- if( CMAKE_HOST_WIN32 )
-  file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS "${ANDROID_NDK_SEARCH_PATHS}" "$ENV{SystemDrive}/NVPACK" )
- else()
-  file( TO_CMAKE_PATH "$ENV{HOME}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS /opt "${ANDROID_NDK_SEARCH_PATHS}/NVPACK" )
- endif()
-endif()
-if( NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
- set( ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH /opt/android-toolchain )
-endif()
-
-# known ABIs
-set( ANDROID_SUPPORTED_ABIS_arm "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
-set( ANDROID_SUPPORTED_ABIS_arm64 "arm64-v8a" )
-set( ANDROID_SUPPORTED_ABIS_x86 "x86" )
-set( ANDROID_SUPPORTED_ABIS_x86_64 "x86_64" )
-set( ANDROID_SUPPORTED_ABIS_mips "mips" )
-set( ANDROID_SUPPORTED_ABIS_mips64 "mips64" )
-
-# API level defaults
-set( ANDROID_DEFAULT_NDK_API_LEVEL 8 )
-set( ANDROID_DEFAULT_NDK_API_LEVEL_arm64 21 )
-set( ANDROID_DEFAULT_NDK_API_LEVEL_x86 9 )
-set( ANDROID_DEFAULT_NDK_API_LEVEL_x86_64 21 )
-set( ANDROID_DEFAULT_NDK_API_LEVEL_mips 9 )
-set( ANDROID_DEFAULT_NDK_API_LEVEL_mips64 21 )
-
-
-macro( __LIST_FILTER listvar regex )
-  if( ${listvar} )
-    foreach( __val ${${listvar}} )
-      if( __val MATCHES "${regex}" )
-        list( REMOVE_ITEM ${listvar} "${__val}" )
-      endif()
-    endforeach()
-  endif()
-endmacro()
 
 macro( __INIT_VARIABLE var_name )
   set( __test_path 0 )
@@ -315,7 +568,7 @@ macro( __DETECT_NATIVE_API_LEVEL _var _path )
 endmacro()
 
 macro( __DETECT_TOOLCHAIN_MACHINE_NAME _var _root )
- if( EXISTS "${_root}" )
+  if( EXISTS "${_root}" )
     file( GLOB __gccExePath RELATIVE "${_root}/bin/" "${_root}/bin/*-gcc${TOOL_OS_SUFFIX}" )
     __LIST_FILTER( __gccExePath "^[.].*" )
     list( LENGTH __gccExePath __gccExePathsCount )
@@ -333,180 +586,6 @@ macro( __DETECT_TOOLCHAIN_MACHINE_NAME _var _root )
     set( ${_var} "" )
   endif()
 endmacro()
-
-
-# fight against cygwin
-set( ANDROID_FORBID_SYGWIN TRUE CACHE BOOL "Prevent cmake from working under cygwin and using cygwin tools")
-mark_as_advanced( ANDROID_FORBID_SYGWIN )
-if( ANDROID_FORBID_SYGWIN )
- if( CYGWIN )
-  message( FATAL_ERROR "Android NDK and android-cmake toolchain are not welcome Cygwin. It is unlikely that this cmake toolchain will work under cygwin. But if you want to try then you can set cmake variable ANDROID_FORBID_SYGWIN to FALSE and rerun cmake." )
- endif()
-
- if( CMAKE_HOST_WIN32 )
-  # remove cygwin from PATH
-  set( __new_path "$ENV{PATH}")
-  __LIST_FILTER( __new_path "cygwin" )
-  set(ENV{PATH} "${__new_path}")
-  unset(__new_path)
- endif()
-endif()
-
-
-# detect current host platform
-if( NOT DEFINED ANDROID_NDK_HOST_X64 AND (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "amd64|x86_64|AMD64" OR CMAKE_HOST_APPLE) )
- set( ANDROID_NDK_HOST_X64 1 CACHE BOOL "Try to use 64-bit compiler toolchain" )
- mark_as_advanced( ANDROID_NDK_HOST_X64 )
-endif()
-
-set( TOOL_OS_SUFFIX "" )
-if( CMAKE_HOST_APPLE )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "darwin-x86_64" )
- set( ANDROID_NDK_HOST_SYSTEM_NAME2 "darwin-x86" )
-elseif( CMAKE_HOST_WIN32 )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "windows-x86_64" )
- set( ANDROID_NDK_HOST_SYSTEM_NAME2 "windows" )
- set( TOOL_OS_SUFFIX ".exe" )
-elseif( CMAKE_HOST_UNIX )
- set( ANDROID_NDK_HOST_SYSTEM_NAME "linux-x86_64" )
- set( ANDROID_NDK_HOST_SYSTEM_NAME2 "linux-x86" )
-else()
- message( FATAL_ERROR "Cross-compilation on your platform is not supported by this cmake toolchain" )
-endif()
-
-if( NOT ANDROID_NDK_HOST_X64 )
- set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} )
-endif()
-
-# see if we have path to Android NDK
-if( NOT ANDROID_NDK AND NOT ANDROID_STANDALONE_TOOLCHAIN )
-  __INIT_VARIABLE( ANDROID_NDK PATH ENV_ANDROID_NDK )
-endif()
-if( NOT ANDROID_NDK )
- # see if we have path to Android standalone toolchain
- __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ENV_ANDROID_STANDALONE_TOOLCHAIN )
-
- if( NOT ANDROID_STANDALONE_TOOLCHAIN )
-  #try to find Android NDK in one of the the default locations
-  set( __ndkSearchPaths )
-  foreach( __ndkSearchPath ${ANDROID_NDK_SEARCH_PATHS} )
-   foreach( suffix ${ANDROID_SUPPORTED_NDK_VERSIONS} )
-    list( APPEND __ndkSearchPaths "${__ndkSearchPath}/android-ndk${suffix}" )
-   endforeach()
-  endforeach()
-  __INIT_VARIABLE( ANDROID_NDK PATH VALUES ${__ndkSearchPaths} )
-  unset( __ndkSearchPaths )
-
-  if( ANDROID_NDK )
-   message( STATUS "Using default path for Android NDK: ${ANDROID_NDK}" )
-   message( STATUS "  If you prefer to use a different location, please define a cmake or environment variable: ANDROID_NDK" )
-  else()
-   #try to find Android standalone toolchain in one of the the default locations
-   __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
-
-   if( ANDROID_STANDALONE_TOOLCHAIN )
-    message( STATUS "Using default path for standalone toolchain ${ANDROID_STANDALONE_TOOLCHAIN}" )
-    message( STATUS "  If you prefer to use a different location, please define the variable: ANDROID_STANDALONE_TOOLCHAIN" )
-   endif( ANDROID_STANDALONE_TOOLCHAIN )
-  endif( ANDROID_NDK )
- endif( NOT ANDROID_STANDALONE_TOOLCHAIN )
-endif( NOT ANDROID_NDK )
-
-# remember found paths
-if( ANDROID_NDK )
- get_filename_component( ANDROID_NDK "${ANDROID_NDK}" ABSOLUTE )
- set( ANDROID_NDK "${ANDROID_NDK}" CACHE INTERNAL "Path of the Android NDK" FORCE )
- set( BUILD_WITH_ANDROID_NDK True )
- if( EXISTS "${ANDROID_NDK}/RELEASE.TXT" )
-  file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX "r[0-9]+[a-z]?" )
-  string( REGEX MATCH "r([0-9]+)([a-z]?)" ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
- else()
-  set( ANDROID_NDK_RELEASE "r1x" )
-  set( ANDROID_NDK_RELEASE_FULL "unreleased" )
- endif()
- string( REGEX REPLACE "r([0-9]+)([a-z]?)" "\\1*1000" ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE}" )
- if( CMAKE_VERSION VERSION_GREATER 2.8.4 )
-  string( FIND " abcdefghijklmnopqastuvwxyz" "${CMAKE_MATCH_2}" __ndkReleaseLetterNum )
- else()
-  set( __ndkReleaseLetterNum 0 )
-  foreach( letter "" "a" "b" "c" "d" "e" "f" "g" )
-   if( letter STREQUAL CMAKE_MATCH_2 )
-    break()
-   endif()
-   set( __ndkReleaseLetterNum "${__ndkReleaseLetterNum}+1" )
-  endforeach()
- endif()
- math( EXPR ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE_NUM}+${__ndkReleaseLetterNum}" )
-elseif( ANDROID_STANDALONE_TOOLCHAIN )
- get_filename_component( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" ABSOLUTE )
- # try to detect change
- if( CMAKE_AR )
-  string( LENGTH "${ANDROID_STANDALONE_TOOLCHAIN}" __length )
-  string( SUBSTRING "${CMAKE_AR}" 0 ${__length} __androidStandaloneToolchainPreviousPath )
-  if( NOT __androidStandaloneToolchainPreviousPath STREQUAL ANDROID_STANDALONE_TOOLCHAIN )
-   message( FATAL_ERROR "It is not possible to change path to the Android standalone toolchain on subsequent run." )
-  endif()
-  unset( __androidStandaloneToolchainPreviousPath )
-  unset( __length )
- endif()
- set( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" CACHE INTERNAL "Path of the Android standalone toolchain" FORCE )
- set( BUILD_WITH_STANDALONE_TOOLCHAIN True )
-else()
- list(GET ANDROID_NDK_SEARCH_PATHS 0 ANDROID_NDK_SEARCH_PATH)
- message( FATAL_ERROR "Could not find neither Android NDK nor Android standalone toolchain.
-    You should either set an environment variable:
-      export ANDROID_NDK=~/my-android-ndk
-    or
-      export ANDROID_STANDALONE_TOOLCHAIN=~/my-android-toolchain
-    or put the toolchain or NDK in the default path:
-      sudo ln -s ~/my-android-ndk ${ANDROID_NDK_SEARCH_PATH}/android-ndk
-      sudo ln -s ~/my-android-toolchain ${ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH}" )
-endif()
-
-# android NDK layout
-if( BUILD_WITH_ANDROID_NDK )
- if( NOT DEFINED ANDROID_NDK_LAYOUT )
-  # try to automatically detect the layout
-  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT")
-   set( ANDROID_NDK_LAYOUT "RELEASE" )
-  elseif( EXISTS "${ANDROID_NDK}/../../linux-x86/toolchain/" )
-   set( ANDROID_NDK_LAYOUT "LINARO" )
-  elseif( EXISTS "${ANDROID_NDK}/../../gcc/" )
-   set( ANDROID_NDK_LAYOUT "ANDROID" )
-  endif()
- endif()
- set( ANDROID_NDK_LAYOUT "${ANDROID_NDK_LAYOUT}" CACHE STRING "The inner layout of NDK" )
- mark_as_advanced( ANDROID_NDK_LAYOUT )
- if( ANDROID_NDK_LAYOUT STREQUAL "LINARO" )
-  set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} ) # only 32-bit at the moment
-  set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/../../${ANDROID_NDK_HOST_SYSTEM_NAME}/toolchain" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH  "" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH2 "" )
- elseif( ANDROID_NDK_LAYOUT STREQUAL "ANDROID" )
-  set( ANDROID_NDK_HOST_SYSTEM_NAME ${ANDROID_NDK_HOST_SYSTEM_NAME2} ) # only 32-bit at the moment
-  set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/../../gcc/${ANDROID_NDK_HOST_SYSTEM_NAME}/arm" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH  "" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH2 "" )
- else() # ANDROID_NDK_LAYOUT STREQUAL "RELEASE"
-  set( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK}/toolchains" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH  "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME}" )
-  set( ANDROID_NDK_TOOLCHAINS_SUBPATH2 "/prebuilt/${ANDROID_NDK_HOST_SYSTEM_NAME2}" )
- endif()
- get_filename_component( ANDROID_NDK_TOOLCHAINS_PATH "${ANDROID_NDK_TOOLCHAINS_PATH}" ABSOLUTE )
-
- # try to detect change of NDK
- if( CMAKE_AR )
-  string( LENGTH "${ANDROID_NDK_TOOLCHAINS_PATH}" __length )
-  string( SUBSTRING "${CMAKE_AR}" 0 ${__length} __androidNdkPreviousPath )
-  if( NOT __androidNdkPreviousPath STREQUAL ANDROID_NDK_TOOLCHAINS_PATH )
-   message( FATAL_ERROR "It is not possible to change the path to the NDK on subsequent CMake run. You must remove all generated files from your build folder first.
-   " )
-  endif()
-  unset( __androidNdkPreviousPath )
-  unset( __length )
- endif()
-endif()
-
 
 # get all the details about standalone toolchain
 if( BUILD_WITH_STANDALONE_TOOLCHAIN )
@@ -542,89 +621,100 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
 endif()
 
 macro( __GLOB_NDK_TOOLCHAINS __availableToolchainsVar __availableToolchainsLst __toolchain_subpath )
- foreach( __toolchain ${${__availableToolchainsLst}} )
-  if( "${__toolchain}" MATCHES "-clang3[.][0-9]$" AND NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/${__toolchain}${__toolchain_subpath}" )
-   SET( __toolchainVersionRegex "^TOOLCHAIN_VERSION[\t ]+:=[\t ]+(.*)$" )
-   FILE( STRINGS "${ANDROID_NDK_TOOLCHAINS_PATH}/${__toolchain}/setup.mk" __toolchainVersionStr REGEX "${__toolchainVersionRegex}" )
-   if( __toolchainVersionStr )
-    string( REGEX REPLACE "${__toolchainVersionRegex}" "\\1" __toolchainVersionStr "${__toolchainVersionStr}" )
-    string( REGEX REPLACE "-clang3[.][0-9]$" "-${__toolchainVersionStr}" __gcc_toolchain "${__toolchain}" )
-   else()
-    string( REGEX REPLACE "-clang3[.][0-9]$" "-4.6" __gcc_toolchain "${__toolchain}" )
-   endif()
-   unset( __toolchainVersionStr )
-   unset( __toolchainVersionRegex )
-  else()
-   set( __gcc_toolchain "${__toolchain}" )
-  endif()
-  __DETECT_TOOLCHAIN_MACHINE_NAME( __machine "${ANDROID_NDK_TOOLCHAINS_PATH}/${__gcc_toolchain}${__toolchain_subpath}" )
-  if( __machine )
-   string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9x]+)?$" __version "${__gcc_toolchain}" )
-   if( __machine MATCHES x86_64 )
-    set( __arch "x86_64" )
-   elseif( __machine MATCHES i686 )
-    set( __arch "x86" )
-   elseif( __machine MATCHES aarch64 )
-    set( __arch "arm64" )
-   elseif( __machine MATCHES arm )
-    set( __arch "arm" )
-   elseif( __machine MATCHES mips64el )
-    set( __arch "mips64" )
-   elseif( __machine MATCHES mipsel )
-    set( __arch "mips" )
-   else()
-    set( __arch "" )
-   endif()
-   #message("machine: !${__machine}!\narch: !${__arch}!\nversion: !${__version}!\ntoolchain: !${__toolchain}!\n")
-   if (__arch)
-    list( APPEND __availableToolchainMachines "${__machine}" )
-    list( APPEND __availableToolchainArchs "${__arch}" )
-    list( APPEND __availableToolchainCompilerVersions "${__version}" )
-    list( APPEND ${__availableToolchainsVar} "${__toolchain}" )
-   endif()
-  endif()
-  unset( __gcc_toolchain )
- endforeach()
+  foreach( __toolchain ${${__availableToolchainsLst}} )
+    # parse setup.mk for reqired gcc tooolchain version in case of clang
+    if( "${__toolchain}" MATCHES "-clang3[.][0-9]$" AND NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/${__toolchain}${__toolchain_subpath}" )
+      set( __toolchainVersionRegex "^TOOLCHAIN_VERSION[\t ]+:=[\t ]+(.*)$" )
+      file( STRINGS "${ANDROID_NDK_TOOLCHAINS_PATH}/${__toolchain}/setup.mk" __toolchainVersionStr REGEX "${__toolchainVersionRegex}" )
+      if( __toolchainVersionStr )
+        string( REGEX REPLACE "${__toolchainVersionRegex}" "\\1" __toolchainVersionStr "${__toolchainVersionStr}" )
+        string( REGEX REPLACE "-clang3[.][0-9]$" "-${__toolchainVersionStr}" __gcc_toolchain "${__toolchain}" )
+      else()
+        string( REGEX REPLACE "-clang3[.][0-9]$" "-4.6" __gcc_toolchain "${__toolchain}" )
+      endif()
+      unset( __toolchainVersionStr )
+      unset( __toolchainVersionRegex )
+    else()
+      set( __gcc_toolchain "${__toolchain}" )
+    endif()
+
+    __DETECT_TOOLCHAIN_MACHINE_NAME( __machine "${ANDROID_NDK_TOOLCHAINS_PATH}/${__gcc_toolchain}${__toolchain_subpath}" )
+
+    if( __machine )
+      string( REGEX MATCH "[0-9]+[.][0-9]+([.][0-9x]+)?$" __version "${__gcc_toolchain}" )
+      if( __machine MATCHES x86_64 )
+        set( __arch "x86_64" )
+      elseif( __machine MATCHES i686 )
+        set( __arch "x86" )
+      elseif( __machine MATCHES aarch64 )
+        set( __arch "arm64" )
+      elseif( __machine MATCHES arm )
+        set( __arch "arm" )
+      elseif( __machine MATCHES mips64el )
+        set( __arch "mips64" )
+      elseif( __machine MATCHES mipsel )
+        set( __arch "mips" )
+      else()
+        set( __arch "" )
+      endif()
+      #message("machine: !${__machine}!\narch: !${__arch}!\nversion: !${__version}!\ntoolchain: !${__toolchain}!\n")
+      if (__arch)
+        list( APPEND __availableToolchainMachines "${__machine}" )
+        list( APPEND __availableToolchainArchs "${__arch}" )
+        list( APPEND __availableToolchainCompilerVersions "${__version}" )
+        list( APPEND ${__availableToolchainsVar} "${__toolchain}" )
+      endif()
+    endif()
+    unset( __gcc_toolchain )
+  endforeach()
 endmacro()
+
 
 # get all the details about NDK
 if( BUILD_WITH_ANDROID_NDK )
- file( GLOB ANDROID_SUPPORTED_NATIVE_API_LEVELS RELATIVE "${ANDROID_NDK}/platforms" "${ANDROID_NDK}/platforms/android-*" )
- string( REPLACE "android-" "" ANDROID_SUPPORTED_NATIVE_API_LEVELS "${ANDROID_SUPPORTED_NATIVE_API_LEVELS}" )
- set( __availableToolchains "" )
- set( __availableToolchainMachines "" )
- set( __availableToolchainArchs "" )
- set( __availableToolchainCompilerVersions "" )
- if( ANDROID_TOOLCHAIN_NAME AND EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/${ANDROID_TOOLCHAIN_NAME}/" )
-  # do not go through all toolchains if we know the name
-  set( __availableToolchainsLst "${ANDROID_TOOLCHAIN_NAME}" )
-  __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
-  if( NOT __availableToolchains AND NOT ANDROID_NDK_TOOLCHAINS_SUBPATH STREQUAL ANDROID_NDK_TOOLCHAINS_SUBPATH2 )
-   __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH2}" )
-   if( __availableToolchains )
-    set( ANDROID_NDK_TOOLCHAINS_SUBPATH ${ANDROID_NDK_TOOLCHAINS_SUBPATH2} )
-   endif()
+  # list of API levels
+  file( GLOB ANDROID_SUPPORTED_NATIVE_API_LEVELS RELATIVE "${ANDROID_NDK}/platforms" "${ANDROID_NDK}/platforms/android-*" )
+  string( REPLACE "android-" "" ANDROID_SUPPORTED_NATIVE_API_LEVELS "${ANDROID_SUPPORTED_NATIVE_API_LEVELS}" )
+
+  # collect details about available toolchains
+  set( __availableToolchains "" )
+  set( __availableToolchainMachines "" )
+  set( __availableToolchainArchs "" )
+  set( __availableToolchainCompilerVersions "" )
+
+  # if we have the name, we can restict tools search to single location
+  if( ANDROID_TOOLCHAIN_NAME AND EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/${ANDROID_TOOLCHAIN_NAME}/" )
+    set( __availableToolchainsLst "${ANDROID_TOOLCHAIN_NAME}" )
+    __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
+    if( NOT __availableToolchains AND NOT ANDROID_NDK_TOOLCHAINS_SUBPATH STREQUAL ANDROID_NDK_TOOLCHAINS_SUBPATH32 )
+      __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH32}" )
+      if( __availableToolchains )
+        set( ANDROID_NDK_TOOLCHAINS_SUBPATH ${ANDROID_NDK_TOOLCHAINS_SUBPATH32} )
+      endif()
+    endif()
   endif()
- endif()
- if( NOT __availableToolchains )
-  file( GLOB __availableToolchainsLst RELATIVE "${ANDROID_NDK_TOOLCHAINS_PATH}" "${ANDROID_NDK_TOOLCHAINS_PATH}/*" )
-  if( __availableToolchains )
-   list(SORT __availableToolchainsLst) # we need clang to go after gcc
+
+  # otherwise glob them all
+  if( NOT __availableToolchains )
+    file( GLOB __availableToolchainsLst RELATIVE "${ANDROID_NDK_TOOLCHAINS_PATH}" "${ANDROID_NDK_TOOLCHAINS_PATH}/*" )
+    if( __availableToolchains )
+      list(SORT __availableToolchainsLst) # we need clang to go after gcc
+    endif()
+    __LIST_FILTER( __availableToolchainsLst "^[.]" )
+    __LIST_FILTER( __availableToolchainsLst "llvm" )
+    __LIST_FILTER( __availableToolchainsLst "renderscript" )
+    __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
+    if( NOT __availableToolchains AND NOT ANDROID_NDK_TOOLCHAINS_SUBPATH STREQUAL ANDROID_NDK_TOOLCHAINS_SUBPATH32 )
+      __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH32}" )
+      if( __availableToolchains )
+        set( ANDROID_NDK_TOOLCHAINS_SUBPATH ${ANDROID_NDK_TOOLCHAINS_SUBPATH32} )
+      endif()
+    endif()
   endif()
-  __LIST_FILTER( __availableToolchainsLst "^[.]" )
-  __LIST_FILTER( __availableToolchainsLst "llvm" )
-  __LIST_FILTER( __availableToolchainsLst "renderscript" )
-  __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
-  if( NOT __availableToolchains AND NOT ANDROID_NDK_TOOLCHAINS_SUBPATH STREQUAL ANDROID_NDK_TOOLCHAINS_SUBPATH2 )
-   __GLOB_NDK_TOOLCHAINS( __availableToolchains __availableToolchainsLst "${ANDROID_NDK_TOOLCHAINS_SUBPATH2}" )
-   if( __availableToolchains )
-    set( ANDROID_NDK_TOOLCHAINS_SUBPATH ${ANDROID_NDK_TOOLCHAINS_SUBPATH2} )
-   endif()
+
+  if( NOT __availableToolchains )
+    __android_fatal_error( "Could not find any working toolchain in the NDK (${ANDROID_NDK}). Probably your have installation problems with this NDK." )
   endif()
- endif()
- if( NOT __availableToolchains )
-  message( FATAL_ERROR "Could not find any working toolchain in the NDK. Probably your Android NDK is broken." )
- endif()
 endif()
 
 # build list of available ABIs
@@ -725,10 +815,10 @@ else()
  message( SEND_ERROR "Unknown ANDROID_ABI=\"${ANDROID_ABI}\" is specified." )
 endif()
 
-if( CMAKE_BINARY_DIR AND EXISTS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeSystem.cmake" )
+if( CMAKE_BINARY_DIR AND EXISTS "${CMAKE_PLATFORM_INFO_DIR}/CMakeSystem.cmake" )
  # really dirty hack
  # it is not possible to change CMAKE_SYSTEM_PROCESSOR after the first run...
- file( APPEND "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeSystem.cmake" "SET(CMAKE_SYSTEM_PROCESSOR \"${CMAKE_SYSTEM_PROCESSOR}\")\n" )
+ file( APPEND "${CMAKE_PLATFORM_INFO_DIR}/CMakeSystem.cmake" "SET(CMAKE_SYSTEM_PROCESSOR \"${CMAKE_SYSTEM_PROCESSOR}\")\n" )
 endif()
 
 if( ANDROID_ARCH_NAME STREQUAL "arm" AND NOT ARMEABI_V6 )
@@ -1174,8 +1264,8 @@ add_definitions( -DANDROID )
 if( ANDROID_SYSROOT MATCHES "[ ;\"]" )
  if( CMAKE_HOST_WIN32 )
   # try to convert path to 8.3 form
-  file( WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/cvt83.cmd" "@echo %~s1" )
-  execute_process( COMMAND "$ENV{ComSpec}" /c "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/cvt83.cmd" "${ANDROID_SYSROOT}"
+  file( WRITE "${CMAKE_PLATFORM_INFO_DIR}/cvt83.cmd" "@echo %~s1" )
+  execute_process( COMMAND "$ENV{ComSpec}" /c "${CMAKE_PLATFORM_INFO_DIR}/cvt83.cmd" "${ANDROID_SYSROOT}"
                    OUTPUT_VARIABLE __path OUTPUT_STRIP_TRAILING_WHITESPACE
                    RESULT_VARIABLE __result ERROR_QUIET )
   if( __result EQUAL 0 )
@@ -1468,7 +1558,7 @@ if( NOT DEFINED ANDROID_EXPLICIT_CRT_LINK )
  string( REPLACE "<CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS>" "-shared" __cmd "${__cmd}" )
  string( REPLACE "<CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG>" "" __cmd "${__cmd}" )
  string( REPLACE "<TARGET_SONAME>" "" __cmd "${__cmd}" )
- string( REPLACE "<TARGET>" "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/toolchain_crtlink_test.so" __cmd "${__cmd}" )
+ string( REPLACE "<TARGET>" "${CMAKE_PLATFORM_INFO_DIR}/toolchain_crtlink_test.so" __cmd "${__cmd}" )
  string( REPLACE "<OBJECTS>" "\"${ANDROID_SYSROOT}/usr/lib/crtbegin_so.o\"" __cmd "${__cmd}" )
  string( REPLACE "<LINK_LIBRARIES>" "" __cmd "${__cmd}" )
  separate_arguments( __cmd )
@@ -1612,7 +1702,7 @@ if( NOT _CMAKE_IN_TRY_COMPILE )
    endif()
   endif()
  endforeach()
- file( WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/android.toolchain.config.cmake" "${__toolchain_config}" )
+ file( WRITE "${CMAKE_PLATFORM_INFO_DIR}/android.toolchain.config.cmake" "${__toolchain_config}" )
  unset( __toolchain_config )
 endif()
 
