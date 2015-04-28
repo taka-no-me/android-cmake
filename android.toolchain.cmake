@@ -1514,7 +1514,7 @@ endif()
 
 
 # set these global flags for cmake client scripts to change behavior
-set( ANDROID True )
+set( ANDROID True CACHE BOOL "Android" )
 set( BUILD_ANDROID True )
 
 # where is the target environment
