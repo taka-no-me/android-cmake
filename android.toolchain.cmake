@@ -598,7 +598,7 @@ if( BUILD_WITH_ANDROID_NDK )
  endif()
  if( NOT __availableToolchains )
   file( GLOB __availableToolchainsLst RELATIVE "${ANDROID_NDK_TOOLCHAINS_PATH}" "${ANDROID_NDK_TOOLCHAINS_PATH}/*" )
-  if( __availableToolchains )
+  if( __availableToolchainsLst )
    list(SORT __availableToolchainsLst) # we need clang to go after gcc
   endif()
   __LIST_FILTER( __availableToolchainsLst "^[.]" )
