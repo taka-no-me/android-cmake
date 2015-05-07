@@ -1496,6 +1496,7 @@ if( ANDROID_CRYSTAX_NDK )
       string(REPLACE "-lm" "" CMAKE_${__lang}_${__op} "${CMAKE_${__lang}_${__op}}")
       set(CMAKE_${__lang}_${__op} "${CMAKE_${__lang}_${__op}} ${ANDROID_CRYSTAX_LINK_LIBRARY_MODS}")
     endforeach()
+    string(REPLACE "<CMAKE_C_COMPILER>" "<CMAKE_CXX_COMPILER>" CMAKE_CXX_${__op} "${CMAKE_CXX_${__op}}")
   endforeach()
 endif()
 
