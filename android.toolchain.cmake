@@ -159,6 +159,9 @@
 #      chosen runtime. If disabled, then the user is responsible for settings
 #      these options.
 #
+#    ANDROID_CRYSTAX_NDK_SHARED_LIBCRYSTAX=OFF - If you're using a CrystaX NDK,
+#      setting this to ON will use the shared libcrystax.so in linking
+#
 #  What?:
 #    android-cmake toolchain searches for NDK/toolchain in the following order:
 #      ANDROID_NDK - cmake parameter
@@ -1731,8 +1734,9 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86", "mips", "arm64-v8a", "x86_64", "mips64" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : from r5 to r10d; set only for NDK
-#   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor)
+#   ANDROID_NDK_RELEASE : from r5 to r10d for standard releases; set only for NDK releases
+#   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor) - set only for standard NDK releases
+#   ANDROID_CRYSTAX_NDK : TRUE if we detected that the NDK is actually a CrystaX NDK
 #   ANDROID_ARCH_NAME : "arm", "x86", "mips", "arm64", "x86_64", "mips64" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
