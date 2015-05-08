@@ -1520,6 +1520,17 @@ set( BUILD_ANDROID True )
 # where is the target environment
 set( CMAKE_FIND_ROOT_PATH "${ANDROID_TOOLCHAIN_ROOT}/bin" "${ANDROID_TOOLCHAIN_ROOT}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" "${ANDROID_SYSROOT}" "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_PREFIX}/share" )
 
+# what do libraries look like
+set( CMAKE_FIND_LIBRARY_PREFIXES
+  ""
+  "${ANDROID_NDK_ABI_NAME}/"
+  "libs/${ANDROID_NDK_ABI_NAME}/"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/"
+  "lib"
+  "${ANDROID_NDK_ABI_NAME}/lib"
+  "libs/${ANDROID_NDK_ABI_NAME}/lib"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/lib" )
+
 # only search for libraries and includes in the ndk toolchain
 set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
 set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY )
