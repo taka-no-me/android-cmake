@@ -1607,6 +1607,17 @@ foreach( __root ${CMAKE_FIND_ROOT_PATH} )
   endif()
 endforeach()
 
+# what do libraries look like
+set( CMAKE_FIND_LIBRARY_PREFIXES
+  ""
+  "${ANDROID_NDK_ABI_NAME}/"
+  "libs/${ANDROID_NDK_ABI_NAME}/"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/"
+  "lib"
+  "${ANDROID_NDK_ABI_NAME}/lib"
+  "libs/${ANDROID_NDK_ABI_NAME}/lib"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/lib" )
+
 # only search for libraries and includes in the ndk toolchain
 set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
 set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY )
