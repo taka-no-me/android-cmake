@@ -1,3 +1,11 @@
+# r10E
+
+* http://dl.google.com/android/ndk/android-ndk-r10e-windows-x86.exe
+* http://dl.google.com/android/ndk/android-ndk-r10e-windows-x86_64.exe
+* http://dl.google.com/android/ndk/android-ndk-r10e-darwin-x86_64.bin
+* http://dl.google.com/android/ndk/android-ndk-r10e-linux-x86.bin
+* http://dl.google.com/android/ndk/android-ndk-r10e-linux-x86_64.bin
+
 # r10d
 
 * http://dl.google.com/android/ndk/android-ndk-r10d-windows-x86.exe
