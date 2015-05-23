@@ -1523,6 +1523,7 @@ set( ANDROID True )
 set( BUILD_ANDROID True )
 
 # where is the target environment
+set( _host_cmake_find_root_path ${CMAKE_FIND_ROOT_PATH} )
 set( CMAKE_FIND_ROOT_PATH "${ANDROID_TOOLCHAIN_ROOT}/bin" "${ANDROID_TOOLCHAIN_ROOT}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" "${ANDROID_SYSROOT}" "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_PREFIX}/share" )
 
 # only search for libraries and includes in the ndk toolchain
@@ -1572,6 +1573,25 @@ macro( find_host_program )
  set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
  set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY )
  set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY )
+endmacro()
+
+
+# macro to find files on the host OS
+macro( find_host_file)
+ SET( _save_root_path ${CMAKE_FIND_ROOT_PATH} )
+ SET( CMAKE_FIND_ROOT_PATH ${_host_cmake_find_root_path} )
+ if( CMAKE_HOST_WIN32 )
+  SET( WIN32 1 )
+  SET( UNIX )
+ elseif( CMAKE_HOST_APPLE )
+  SET( APPLE 1 )
+  SET( UNIX )
+ endif()
+ find_file( ${ARGN} )
+ SET( WIN32 )
+ SET( APPLE )
+ SET( UNIX 1 )
+ SET( CMAKE_FIND_ROOT_PATH $_save_root_path )
 endmacro()
 
 
