@@ -1036,7 +1036,7 @@ if( BUILD_WITH_ANDROID_NDK )
     if( X86 ) 
         set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/gabi++/include" )
     else()
-        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/llvm-libc++abi/include" )
+        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/llvm-libc++abi/libcxxabi/include" )
     endif()
     set( ANDROID_STL_INCLUDE_DIRS     "${ANDROID_LLVM_ROOT}/libcxx/include" "${ANDROID_ABI_INCLUDE_DIRS}" )
     # android support sfiles
