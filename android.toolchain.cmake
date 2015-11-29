@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # ------------------------------------------------------------------------------
-#  Android CMake toolchain file, for use with the Android NDK r5-r10d
+#  Android CMake toolchain file, for use with the Android NDK r5-r10e
 #  Requires cmake 2.6.3 or newer (2.8.9 or newer is recommended).
 #  See home page: https://github.com/taka-no-me/android-cmake
 #
@@ -216,7 +216,7 @@ set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
 # NDK search paths
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10e -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if( NOT DEFINED ANDROID_NDK_SEARCH_PATHS )
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
@@ -833,7 +833,7 @@ set( ANDROID_STL_FORCE_FEATURES ON CACHE BOOL "automatically configure rtti and 
 mark_as_advanced( ANDROID_STL ANDROID_STL_FORCE_FEATURES )
 
 if( BUILD_WITH_ANDROID_NDK )
- if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared)$")
+ if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared|c\\+\\+_shared|c\\+\\+_static)$")
   message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
 The possible values are:
   none           -> Do not configure the runtime.
@@ -845,6 +845,8 @@ The possible values are:
   stlport_shared -> Use the STLport runtime as a shared library.
   gnustl_static  -> (default) Use the GNU STL as a static library.
   gnustl_shared  -> Use the GNU STL as a shared library.
+  c++_shared     -> Use the LLVM STL as a shared library.
+  c++_static     -> Use the LLVM STL as a static library.
 " )
  endif()
 elseif( BUILD_WITH_STANDALONE_TOOLCHAIN )
@@ -942,7 +944,9 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
    elseif( EXISTS "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
     set( __libstl "${ANDROID_STANDALONE_TOOLCHAIN}/${ANDROID_TOOLCHAIN_MACHINE_NAME}/lib/libgnustl_shared.so" )
    endif()
-  endif()
+  elseif( ANDROID_STL STREQUAL "c\\+\\+_shared" )
+    set( __libstl "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libs/${TARGET_ARCH}/libc++_shared.so" )
+   endif()
  endif()
 endif()
 
@@ -1026,6 +1030,50 @@ if( BUILD_WITH_ANDROID_NDK )
   else()
    set( __libstl                "${__libstl}/libs/${ANDROID_NDK_ABI_NAME}/libstdc++.a" )
   endif()
+ elseif( ANDROID_STL MATCHES "c\\+\\+_shared" )
+    set( ANDROID_EXCEPTIONS       ON )
+    set( ANDROID_RTTI             ON )
+    set( ANDROID_CXX_ROOT     "${ANDROID_NDK}/sources/cxx-stl/" )
+    set( ANDROID_LLVM_ROOT    "${ANDROID_CXX_ROOT}/llvm-libc++" )
+    if( X86 ) 
+        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/gabi++/include" )
+    else()
+        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/llvm-libc++abi/libcxxabi/include" )
+    endif()
+    set( ANDROID_STL_INCLUDE_DIRS     "${ANDROID_LLVM_ROOT}/libcxx/include" "${ANDROID_ABI_INCLUDE_DIRS}" )
+    # android support sfiles
+    include_directories ( SYSTEM ${ANDROID_NDK}/sources/android/support/include )
+    if( EXISTS "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_shared.so" )
+        set( __libstl                           "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_shared.so" )
+    else()
+        message( "c++ shared library doesn't exist" )
+    endif()
+ elseif( ANDROID_STL MATCHES "c\\+\\+_static" )
+    set( ANDROID_EXCEPTIONS       ON )
+    set( ANDROID_RTTI             ON )
+    set( ANDROID_CXX_ROOT     "${ANDROID_NDK}/sources/cxx-stl/" )
+    set( ANDROID_LLVM_ROOT    "${ANDROID_CXX_ROOT}/llvm-libc++" )
+    if( X86 ) 
+        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/gabi++/include" )
+    else()
+        set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/llvm-libc++abi/libcxxabi/include" )
+    endif()
+    set( ANDROID_STL_INCLUDE_DIRS     "${ANDROID_LLVM_ROOT}/libcxx/include" "${ANDROID_ABI_INCLUDE_DIRS}" )
+    # android support sfiles
+    include_directories ( SYSTEM ${ANDROID_NDK}/sources/android/support/include )
+    if( NOT ANDROID_FORCE_ARM_BUILD )
+        if( EXISTS "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/thumb/libc++_static.a" )
+            set( __libstl                           "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/thumb/libc++_static.a" )
+        else()
+            message( "c++ static library doesn't exist" )
+        endif()
+    else()
+        if( EXISTS "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_static.a" )
+            set( __libstl                           "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_static.a" )
+        else()
+            message( "c++ static library doesn't exist" )
+        endif()
+    endif()
  else()
   message( FATAL_ERROR "Unknown runtime: ${ANDROID_STL}" )
  endif()
@@ -1098,6 +1146,7 @@ if( NOT CMAKE_C_COMPILER )
  endif()
  set( CMAKE_ASM_COMPILER "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc${TOOL_OS_SUFFIX}"     CACHE PATH "assembler" )
  set( CMAKE_STRIP        "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-strip${TOOL_OS_SUFFIX}"   CACHE PATH "strip" )
+ set( CMAKE_AR           "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-ar${TOOL_OS_SUFFIX}"      CACHE PATH "archive" )
  if( EXISTS "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc-ar${TOOL_OS_SUFFIX}" )
   # Use gcc-ar if we have it for better LTO support.
   set( CMAKE_AR           "${ANDROID_TOOLCHAIN_ROOT}/bin/${ANDROID_TOOLCHAIN_MACHINE_NAME}-gcc-ar${TOOL_OS_SUFFIX}"      CACHE PATH "archive" )
@@ -1493,9 +1542,9 @@ endif()
 set( CMAKE_INSTALL_PREFIX "${ANDROID_TOOLCHAIN_ROOT}/user" CACHE STRING "path for installing" )
 
 if( DEFINED LIBRARY_OUTPUT_PATH_ROOT
-      OR EXISTS "${CMAKE_SOURCE_DIR}/AndroidManifest.xml"
+      OR EXISTS "${CMAKE_SOURCE_DIR}/android/AndroidManifest.xml"
       OR (EXISTS "${CMAKE_SOURCE_DIR}/../AndroidManifest.xml" AND EXISTS "${CMAKE_SOURCE_DIR}/../jni/") )
-  set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR} CACHE PATH "Root for binaries output, set this to change where Android libs are installed to" )
+  set( LIBRARY_OUTPUT_PATH_ROOT ${CMAKE_SOURCE_DIR}/android CACHE PATH "Root for binaries output, set this to change where Android libs are installed to" )
   if( NOT _CMAKE_IN_TRY_COMPILE )
     if( EXISTS "${CMAKE_SOURCE_DIR}/jni/CMakeLists.txt" )
       set( EXECUTABLE_OUTPUT_PATH "${LIBRARY_OUTPUT_PATH_ROOT}/bin/${ANDROID_NDK_ABI_NAME}" CACHE PATH "Output directory for applications" )
@@ -1664,7 +1713,7 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86", "mips", "arm64-v8a", "x86_64", "mips64" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : from r5 to r10d; set only for NDK
+#   ANDROID_NDK_RELEASE : from r5 to r10e; set only for NDK
 #   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor)
 #   ANDROID_ARCH_NAME : "arm", "x86", "mips", "arm64", "x86_64", "mips64" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
