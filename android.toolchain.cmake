@@ -1189,6 +1189,7 @@ if( ANDROID_SYSROOT MATCHES "[ ;\"]" )
 else()
  set( ANDROID_CXX_FLAGS "--sysroot=${ANDROID_SYSROOT}" )
 endif()
+set( CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} ${ANDROID_CXX_FLAGS}" )
 
 # NDK flags
 if (ARM64_V8A )
