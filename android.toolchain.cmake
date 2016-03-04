@@ -1506,6 +1506,9 @@ if( DEFINED LIBRARY_OUTPUT_PATH_ROOT
   endif()
 endif()
 
+# make sure that there is no empty soname used
+string(REPLACE "<CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG><TARGET_SONAME>" "" CMAKE_CXX_CREATE_SHARED_MODULE "${CMAKE_CXX_CREATE_SHARED_MODULE}")
+
 # copy shaed stl library to build directory
 if( NOT _CMAKE_IN_TRY_COMPILE AND __libstl MATCHES "[.]so$" AND DEFINED LIBRARY_OUTPUT_PATH )
   get_filename_component( __libstlname "${__libstl}" NAME )
