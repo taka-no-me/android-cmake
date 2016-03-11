@@ -1,5 +1,6 @@
 # Copyright (c) 2010-2011, Ethan Rublee
 # Copyright (c) 2011-2014, Andrey Kamaev
+# Copyright (c) 2015-2016, Jeffrey Rogers
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,7 +30,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # ------------------------------------------------------------------------------
-#  Android CMake toolchain file, for use with the Android NDK r5-r10d
+#  Android CMake toolchain file, for use with the Android NDK r5-r11
 #  Requires cmake 2.6.3 or newer (2.8.9 or newer is recommended).
 #  See home page: https://github.com/taka-no-me/android-cmake
 #
@@ -154,6 +155,10 @@
 #                          Implies -frtti -fno-exceptions.
 #                          Available for NDK r7b and newer.
 #                          Silently degrades to gnustl_static if not available.
+#        c++_static     -> Use the LLVM libc++ runtime as a static library.
+#                          Implies -frtti -fexceptions.
+#        c++_shared     -> Use the LLVM libc++ runtime as a shared library.
+#                          Implies -frtti -fexceptions.
 #
 #    ANDROID_STL_FORCE_FEATURES=ON - turn rtti and exceptions support based on
 #      chosen runtime. If disabled, then the user is responsible for settings
@@ -216,7 +221,7 @@ set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
 
 # NDK search paths
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
+set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r11 -r10e -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
 if( NOT DEFINED ANDROID_NDK_SEARCH_PATHS )
  if( CMAKE_HOST_WIN32 )
   file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
@@ -833,7 +838,7 @@ set( ANDROID_STL_FORCE_FEATURES ON CACHE BOOL "automatically configure rtti and 
 mark_as_advanced( ANDROID_STL ANDROID_STL_FORCE_FEATURES )
 
 if( BUILD_WITH_ANDROID_NDK )
- if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared)$")
+ if( NOT "${ANDROID_STL}" MATCHES "^(none|system|system_re|gabi\\+\\+_static|gabi\\+\\+_shared|stlport_static|stlport_shared|gnustl_static|gnustl_shared|c\\+\\+_static|c\\+\\+_shared)$")
   message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
 The possible values are:
   none           -> Do not configure the runtime.
@@ -845,15 +850,19 @@ The possible values are:
   stlport_shared -> Use the STLport runtime as a shared library.
   gnustl_static  -> (default) Use the GNU STL as a static library.
   gnustl_shared  -> Use the GNU STL as a shared library.
+  c++_static     -> Use LLVM libc++ runtime as static library.
+  c++_shared     -> Use LLVM libc++ runtime as shared library.
 " )
  endif()
 elseif( BUILD_WITH_STANDALONE_TOOLCHAIN )
- if( NOT "${ANDROID_STL}" MATCHES "^(none|gnustl_static|gnustl_shared)$")
+ if( NOT "${ANDROID_STL}" MATCHES "^(none|gnustl_static|gnustl_shared|c\\+\\+_static|c\\+\\+_shared)$")
   message( FATAL_ERROR "ANDROID_STL is set to invalid value \"${ANDROID_STL}\".
 The possible values are:
   none           -> Do not configure the runtime.
   gnustl_static  -> (default) Use the GNU STL as a static library.
   gnustl_shared  -> Use the GNU STL as a shared library.
+  c++_static     -> Use LLVM libc++ runtime as static library.
+  c++_shared     -> Use LLVM libc++ runtime as shared library.
 " )
  endif()
 endif()
@@ -925,7 +934,7 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
    set( __libsupcxx "${__libstl}/libsupc++.a" )
    set( __libstl    "${__libstl}/libstdc++.a" )
   endif()
-  if( NOT EXISTS "${__libsupcxx}" )
+  if( NOT EXISTS "${__libsupcxx}" AND NOT ANDROID_STL STREQUAL "c++_static" AND NOT ANDROID_STL STREQUAL "c++_shared" )
    message( FATAL_ERROR "The required libstdsupc++.a is missing in your standalone toolchain.
  Usually it happens because of bug in make-standalone-toolchain.sh script from NDK r7, r7b and r7c.
  You need to either upgrade to newer NDK or manually copy
@@ -1026,6 +1035,21 @@ if( BUILD_WITH_ANDROID_NDK )
   else()
    set( __libstl                "${__libstl}/libs/${ANDROID_NDK_ABI_NAME}/libstdc++.a" )
   endif()
+ elseif( ANDROID_STL MATCHES "c\\+\\+_shared" OR ANDROID_STL MATCHES "c\\+\\+_static" )
+   set( ANDROID_EXCEPTIONS       ON )
+   set( ANDROID_RTTI             ON )
+   set( ANDROID_CXX_ROOT     "${ANDROID_NDK}/sources/cxx-stl/" )
+   set( ANDROID_LLVM_ROOT    "${ANDROID_CXX_ROOT}/llvm-libc++" )
+   set( ANDROID_ABI_INCLUDE_DIRS "${ANDROID_CXX_ROOT}/llvm-libc++abi/libcxxabi/include" )
+   set( ANDROID_STL_INCLUDE_DIRS     "${ANDROID_LLVM_ROOT}/libcxx/include"
+                                     "${ANDROID_ABI_INCLUDE_DIRS}" )
+   # android support sfiles
+   include_directories ( SYSTEM ${ANDROID_NDK}/sources/android/support/include )
+   if( EXISTS "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_shared.so" )
+    set( __libstl               "${ANDROID_LLVM_ROOT}/libs/${ANDROID_NDK_ABI_NAME}/libc++_static.a" )
+   else()
+    message( "c++ library doesn't exist" )
+   endif()
  else()
   message( FATAL_ERROR "Unknown runtime: ${ANDROID_STL}" )
  endif()
@@ -1388,6 +1412,8 @@ set( CMAKE_CXX_FLAGS           ""                        CACHE STRING "c++ flags
 set( CMAKE_C_FLAGS             ""                        CACHE STRING "c flags" )
 set( CMAKE_CXX_FLAGS_RELEASE   "-O3 -DNDEBUG"            CACHE STRING "c++ Release flags" )
 set( CMAKE_C_FLAGS_RELEASE     "-O3 -DNDEBUG"            CACHE STRING "c Release flags" )
+set( CMAKE_CXX_FLAGS_RELWITHDEBINFO   "-O3 -g -DNDEBUG"     CACHE STRING "c++ RelWithDebInfo flags" )
+set( CMAKE_C_FLAGS_RELWITHDEBINFO     "-O3 -g -DNDEBUG"     CACHE STRING "c RelWithDebInfo flags" )
 set( CMAKE_CXX_FLAGS_DEBUG     "-O0 -g -DDEBUG -D_DEBUG" CACHE STRING "c++ Debug flags" )
 set( CMAKE_C_FLAGS_DEBUG       "-O0 -g -DDEBUG -D_DEBUG" CACHE STRING "c Debug flags" )
 set( CMAKE_SHARED_LINKER_FLAGS ""                        CACHE STRING "shared linker flags" )
@@ -1405,6 +1431,8 @@ set( CMAKE_CXX_FLAGS           "${ANDROID_CXX_FLAGS} ${CMAKE_CXX_FLAGS}" )
 set( CMAKE_C_FLAGS             "${ANDROID_CXX_FLAGS} ${CMAKE_C_FLAGS}" )
 set( CMAKE_CXX_FLAGS_RELEASE   "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELEASE}" )
 set( CMAKE_C_FLAGS_RELEASE     "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELEASE}" )
+set( CMAKE_CXX_FLAGS_RELWITHDEBINFO     "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}" )
+set( CMAKE_C_FLAGS_RELWITHDEBINFO       "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELWITHDEBINFO}" )
 set( CMAKE_CXX_FLAGS_DEBUG     "${ANDROID_CXX_FLAGS_DEBUG} ${CMAKE_CXX_FLAGS_DEBUG}" )
 set( CMAKE_C_FLAGS_DEBUG       "${ANDROID_CXX_FLAGS_DEBUG} ${CMAKE_C_FLAGS_DEBUG}" )
 set( CMAKE_SHARED_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS}" )
@@ -1519,7 +1547,7 @@ endif()
 
 
 # set these global flags for cmake client scripts to change behavior
-set( ANDROID True )
+set( ANDROID True CACHE BOOL "Android" )
 set( BUILD_ANDROID True )
 
 # where is the target environment
