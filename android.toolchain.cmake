@@ -159,6 +159,9 @@
 #      chosen runtime. If disabled, then the user is responsible for settings
 #      these options.
 #
+#    ANDROID_CRYSTAX_NDK_SHARED_LIBCRYSTAX=OFF - If you're using a CrystaX NDK,
+#      setting this to ON will use the shared libcrystax.so in linking
+#
 #  What?:
 #    android-cmake toolchain searches for NDK/toolchain in the following order:
 #      ANDROID_NDK - cmake parameter
@@ -419,14 +422,26 @@ if( ANDROID_NDK )
  set( BUILD_WITH_ANDROID_NDK True )
  if( EXISTS "${ANDROID_NDK}/RELEASE.TXT" )
   file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_RELEASE_FULL LIMIT_COUNT 1 REGEX "r[0-9]+[a-z]?" )
-  string( REGEX MATCH "r([0-9]+)([a-z]?)" ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
+  if( ANDROID_NDK_RELEASE_FULL )
+   string( REGEX MATCH "r([0-9]+)([a-z]?)" ANDROID_NDK_RELEASE "${ANDROID_NDK_RELEASE_FULL}" )
+  endif()
+  file( STRINGS "${ANDROID_NDK}/RELEASE.TXT" ANDROID_NDK_GENERIC_RELEASE_FULL LIMIT_COUNT 1 REGEX "[^ ]+" )
+  if( ANDROID_NDK_GENERIC_RELEASE_FULL )
+   string( REGEX MATCH "^[^ ]+" ANDROID_NDK_GENERIC_RELEASE "${ANDROID_NDK_GENERIC_RELEASE_FULL}" )
+  endif()
  else()
   set( ANDROID_NDK_RELEASE "r1x" )
   set( ANDROID_NDK_RELEASE_FULL "unreleased" )
  endif()
- string( REGEX REPLACE "r([0-9]+)([a-z]?)" "\\1*1000" ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE}" )
- string( FIND " abcdefghijklmnopqastuvwxyz" "${CMAKE_MATCH_2}" __ndkReleaseLetterNum )
- math( EXPR ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE_NUM}+${__ndkReleaseLetterNum}" )
+ if( ANDROID_NDK_RELEASE )
+  string( REGEX REPLACE "r([0-9]+)([a-z]?)" "\\1*1000" ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE}" )
+  string( FIND " abcdefghijklmnopqastuvwxyz" "${CMAKE_MATCH_2}" __ndkReleaseLetterNum )
+  math( EXPR ANDROID_NDK_RELEASE_NUM "${ANDROID_NDK_RELEASE_NUM}+${__ndkReleaseLetterNum}" )
+ else()
+  # This has a release file but it doesn't match a standard release file.
+  set( ANDROID_NDK_RELEASE "${ANDROID_NDK_GENERIC_RELEASE}" )
+  set( ANDROID_NDK_RELEASE_THIRD_PARTY True)
+ endif()
 elseif( ANDROID_STANDALONE_TOOLCHAIN )
  get_filename_component( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" ABSOLUTE )
  # try to detect change
@@ -579,6 +594,14 @@ endmacro()
 
 # get all the details about NDK
 if( BUILD_WITH_ANDROID_NDK )
+ if( ANDROID_NDK_RELEASE_THIRD_PARTY )
+  if( ANDROID_NDK_RELEASE MATCHES "crystax-ndk" )
+   set( ANDROID_CRYSTAX_NDK ON )
+   option( ANDROID_CRYSTAX_NDK_SHARED_LIBCRYSTAX "Should we link against the shared libcrystax instead of the static one?" off )
+  else()
+   set( ANDROID_NDK_RELEASE_UNRECOGNIZED ON )
+  endif()
+ endif()
  file( GLOB ANDROID_SUPPORTED_NATIVE_API_LEVELS RELATIVE "${ANDROID_NDK}/platforms" "${ANDROID_NDK}/platforms/android-*" )
  string( REPLACE "android-" "" ANDROID_SUPPORTED_NATIVE_API_LEVELS "${ANDROID_SUPPORTED_NATIVE_API_LEVELS}" )
  set( __availableToolchains "" )
@@ -1201,7 +1224,7 @@ if (ARM64_V8A )
 elseif( ARMEABI OR ARMEABI_V7A)
  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -funwind-tables" )
  if( NOT ANDROID_FORCE_ARM_BUILD AND NOT ARMEABI_V6 )
-  set( ANDROID_CXX_FLAGS_RELEASE "-mthumb -fomit-frame-pointer -fno-strict-aliasing" )
+  set( ANDROID_CXX_FLAGS_RELEASE "-fomit-frame-pointer -fno-strict-aliasing" )
   set( ANDROID_CXX_FLAGS_DEBUG   "-marm -fno-omit-frame-pointer -fno-strict-aliasing" )
   if( NOT ANDROID_COMPILER_IS_CLANG )
    set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -finline-limit=64" )
@@ -1376,6 +1399,11 @@ if( ANDROID_RELRO )
  set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now" )
 endif()
 
+if( ANDROID_CRYSTAX_NDK )
+ # Preferably use functions from libcrystax and link even if re-defined in later libs (libc, etc...)
+ set( ANDROID_LINKER_FLAGS "${ANDROID_LINKER_FLAGS} -Wl,-z,muldefs" )
+endif()
+
 if( ANDROID_COMPILER_IS_CLANG )
  set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} -Qunused-arguments ${ANDROID_CXX_FLAGS}" )
  if( BUILD_WITH_ANDROID_NDK )
@@ -1447,10 +1475,39 @@ if( DEFINED ANDROID_EXCEPTIONS AND ANDROID_STL_FORCE_FEATURES )
  endif()
 endif()
 
+
 # global includes and link directories
+if( ANDROID_CRYSTAX_NDK )
+  include_directories( SYSTEM "${ANDROID_NDK}/sources/crystax/include")
+  link_directories("${ANDROID_NDK}/sources/crystax/empty")
+endif()
 include_directories( SYSTEM "${ANDROID_SYSROOT}/usr/include" ${ANDROID_STL_INCLUDE_DIRS} )
 get_filename_component(__android_install_path "${CMAKE_INSTALL_PREFIX}/libs/${ANDROID_NDK_ABI_NAME}" ABSOLUTE) # avoid CMP0015 policy warning
 link_directories( "${__android_install_path}" )
+
+
+# CrystaX meddling, to insert libcrystax in the right place in the link line.
+if( ANDROID_CRYSTAX_NDK )
+  set(__conditional_thumb)
+  if( (ARMEABI_V7A OR ARMEABI) AND NOT ANDROID_FORCE_ARM_BUILD )
+    set(_conditional_thumb thumb/)
+  endif()
+  if( ANDROID_CRYSTAX_NDK_SHARED_LIBCRYSTAX )
+    set( ANDROID_CRYSTAX_LIBCRYSTAX_LIBRARY "${ANDROID_NDK}/sources/crystax/libs/${ANDROID_NDK_ABI_NAME}${__conditional_thumb}/libcrystax.so")
+    set( ANDROID_CRYSTAX_LINK_LIBRARY_MODS "${ANDROID_CRYSTAX_LIBCRYSTAX_LIBRARY} -lc")
+  else()
+    set( ANDROID_CRYSTAX_LIBCRYSTAX_LIBRARY "${ANDROID_NDK}/sources/crystax/libs/${ANDROID_NDK_ABI_NAME}${__conditional_thumb}/libcrystax.a")
+    set( ANDROID_CRYSTAX_LINK_LIBRARY_MODS "-u __crystax_on_load -u __crystax_on_unload ${ANDROID_CRYSTAX_LIBCRYSTAX_LIBRARY} -lc")
+  endif()
+  foreach( __op CREATE_SHARED_LIBRARY CREATE_SHARED_MODULE LINK_EXECUTABLE )
+    foreach( __lang C CXX )
+      string(REPLACE "-lm" "" CMAKE_${__lang}_${__op} "${CMAKE_${__lang}_${__op}}")
+      set(CMAKE_${__lang}_${__op} "${CMAKE_${__lang}_${__op}} ${ANDROID_CRYSTAX_LINK_LIBRARY_MODS}")
+    endforeach()
+    string(REPLACE "<CMAKE_C_COMPILER>" "<CMAKE_CXX_COMPILER>" CMAKE_CXX_${__op} "${CMAKE_CXX_${__op}}")
+  endforeach()
+endif()
+
 
 # detect if need link crtbegin_so.o explicitly
 if( NOT DEFINED ANDROID_EXPLICIT_CRT_LINK )
@@ -1517,6 +1574,20 @@ if( NOT _CMAKE_IN_TRY_COMPILE AND __libstl MATCHES "[.]so$" AND DEFINED LIBRARY_
   unset( __libstlname )
 endif()
 
+# CrystaX shared library copy
+if( ANDROID_CRYSTAX_NDK AND NOT _CMAKE_IN_TRY_COMPILE AND DEFINED LIBRARY_OUTPUT_PATH )
+  execute_process( COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${ANDROID_CRYSTAX_LIBCRYSTAX_LIBRARY}" "${LIBRARY_OUTPUT_PATH}/libcrystax.so" RESULT_VARIABLE __fileCopyProcess )
+  if( NOT __fileCopyProcess EQUAL 0 OR NOT EXISTS "${LIBRARY_OUTPUT_PATH}/libcrystax.so")
+    message( SEND_ERROR "Failed copying of libcrystax.so to the ${LIBRARY_OUTPUT_PATH}/libcrystax.so" )
+  endif()
+  unset( __fileCopyProcess )
+endif()
+
+# In case of alternate (non-Google) RELEASE-style NDKs (like CrystaX),
+# but that we don't recognize and handle accordingly
+if( ANDROID_NDK_RELEASE_UNRECOGNIZED )
+  message( STATUS "android-cmake toolchain warning: did not recognize the release in your NDK's RELEASE.TXT file (${ANDROID_NDK_RELEASE}). If your custom NDK requires different build commands than the official ones, there may be corresponding build errors." )
+endif()
 
 # set these global flags for cmake client scripts to change behavior
 set( ANDROID True )
@@ -1524,6 +1595,28 @@ set( BUILD_ANDROID True )
 
 # where is the target environment
 set( CMAKE_FIND_ROOT_PATH "${ANDROID_TOOLCHAIN_ROOT}/bin" "${ANDROID_TOOLCHAIN_ROOT}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" "${ANDROID_SYSROOT}" "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_PREFIX}/share" )
+if( ANDROID_CRYSTAX_NDK )
+  file( GLOB ANDROID_CRYSTAX_EXTRA_LIBS "${ANDROID_NDK}/sources/boost/*" "${ANDROID_NDK}/sources/icu/*" )
+  list( APPEND CMAKE_FIND_ROOT_PATH ${ANDROID_CRYSTAX_EXTRA_LIBS} )
+endif()
+
+set( CMAKE_SYSTEM_LIBRARY_PATH ${CMAKE_SYSTEM_LIBRARY_PATH} )
+foreach( __root ${CMAKE_FIND_ROOT_PATH} )
+  if( EXISTS "${__root}/libs/${ANDROID_NDK_ABI_NAME}" )
+    list( APPEND CMAKE_SYSTEM_LIBRARY_PATH "${__root}/libs/${ANDROID_NDK_ABI_NAME}" )
+  endif()
+endforeach()
+
+# what do libraries look like
+set( CMAKE_FIND_LIBRARY_PREFIXES
+  ""
+  "${ANDROID_NDK_ABI_NAME}/"
+  "libs/${ANDROID_NDK_ABI_NAME}/"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/"
+  "lib"
+  "${ANDROID_NDK_ABI_NAME}/lib"
+  "libs/${ANDROID_NDK_ABI_NAME}/lib"
+  "android/libs/${ANDROID_NDK_ABI_NAME}/lib" )
 
 # only search for libraries and includes in the ndk toolchain
 set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
@@ -1664,8 +1757,9 @@ endif()
 #   BUILD_WITH_STANDALONE_TOOLCHAIN : TRUE if standalone toolchain is used
 #   ANDROID_NDK_HOST_SYSTEM_NAME : "windows", "linux-x86" or "darwin-x86" depending on host platform
 #   ANDROID_NDK_ABI_NAME : "armeabi", "armeabi-v7a", "x86", "mips", "arm64-v8a", "x86_64", "mips64" depending on ANDROID_ABI
-#   ANDROID_NDK_RELEASE : from r5 to r10d; set only for NDK
-#   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor)
+#   ANDROID_NDK_RELEASE : from r5 to r10d for standard releases; set only for NDK releases
+#   ANDROID_NDK_RELEASE_NUM : numeric ANDROID_NDK_RELEASE version (1000*major+minor) - set only for standard NDK releases
+#   ANDROID_CRYSTAX_NDK : TRUE if we detected that the NDK is actually a CrystaX NDK
 #   ANDROID_ARCH_NAME : "arm", "x86", "mips", "arm64", "x86_64", "mips64" depending on ANDROID_ABI
 #   ANDROID_SYSROOT : path to the compiler sysroot
 #   TOOL_OS_SUFFIX : "" or ".exe" depending on host platform
