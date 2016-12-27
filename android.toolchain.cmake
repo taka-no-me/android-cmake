@@ -1246,7 +1246,7 @@ endif()
 
 # ABI-specific flags
 if( ARMEABI_V7A )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv7-a -mfloat-abi=softfp" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -target armv7-none-linux-androideabi -march=armv7-a -mfloat-abi=softfp" )
  if( NEON )
   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=neon" )
  elseif( VFPV3 )
@@ -1255,9 +1255,9 @@ if( ARMEABI_V7A )
   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=vfpv3-d16" )
  endif()
 elseif( ARMEABI_V6 )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv6 -mfloat-abi=softfp -mfpu=vfp" ) # vfp == vfpv2
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -target armv6-none-linux-androideabi -march=armv6 -mfloat-abi=softfp -mfpu=vfp" ) # vfp == vfpv2
 elseif( ARMEABI )
- set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv5te -mtune=xscale -msoft-float" )
+ set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -target armv5te-none-linux-androideabi -march=armv5te -mtune=xscale -msoft-float" )
 endif()
 
 if( ANDROID_STL MATCHES "gnustl" AND (EXISTS "${__libstl}" OR EXISTS "${__libsupcxx}") )
