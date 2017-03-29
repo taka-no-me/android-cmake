@@ -211,6 +211,9 @@ endif()
 # this one not so much
 set( CMAKE_SYSTEM_VERSION 1 )
 
+# this one is also important
+set(CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION ${ANDROID_TOOLCHAIN})
+
 # rpath makes low sense for Android
 set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
@@ -411,6 +414,9 @@ if( NOT ANDROID_NDK )
   endif( ANDROID_NDK )
  endif( NOT ANDROID_STANDALONE_TOOLCHAIN )
 endif( NOT ANDROID_NDK )
+if( NOT ANDROID_SDK )
+  __INIT_VARIABLE( ANDROID_SDK PATH ENV_ANDROID_SDK )
+endif()
 
 # remember found paths
 if( ANDROID_NDK )
@@ -451,6 +457,11 @@ else()
     or put the toolchain or NDK in the default path:
       sudo ln -s ~/my-android-ndk ${ANDROID_NDK_SEARCH_PATH}/android-ndk
       sudo ln -s ~/my-android-toolchain ${ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH}" )
+endif()
+
+if( ANDROID_SDK )
+ get_filename_component( ANDROID_SDK "${ANDROID_SDK}" ABSOLUTE )
+ set( ANDROID_SDK "${ANDROID_SDK}" CACHE INTERNAL "Path of the Android SDK" FORCE )
 endif()
 
 # android NDK layout
@@ -768,8 +779,7 @@ unset( __toolchainArch )
 if( __toolchainIdx EQUAL -1 )
  message( FATAL_ERROR "No one of available compiler toolchains is able to compile for ${ANDROID_ARCH_NAME} platform." )
 endif()
-set( ANDROID_TOOLCHAIN_NAME_ARG ${ANDROID_TOOLCHAIN_NAME})
-list( GET __availableToolchains ${__toolchainIdx} ANDROID_TOOLCHAIN_NAME )
+list( GET __availableToolchains ${__toolchainIdx} ANDROID_TOOLCHAIN_FOUND )
 list( GET __availableToolchainMachines ${__toolchainIdx} ANDROID_TOOLCHAIN_MACHINE_NAME )
 list( GET __availableToolchainCompilerVersions ${__toolchainIdx} ANDROID_COMPILER_VERSION )
 
@@ -948,28 +958,32 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
 endif()
 
 # clang
-if( "${ANDROID_TOOLCHAIN_NAME}" STREQUAL "standalone-clang" )
+if( "${ANDROID_TOOLCHAIN_FOUND}" STREQUAL "standalone-clang" )
  set( ANDROID_COMPILER_IS_CLANG 1 )
  execute_process( COMMAND "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang${TOOL_OS_SUFFIX}" --version OUTPUT_VARIABLE ANDROID_CLANG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE )
  string( REGEX MATCH "[0-9]+[.][0-9]+" ANDROID_CLANG_VERSION "${ANDROID_CLANG_VERSION}")
-elseif( "${ANDROID_TOOLCHAIN_NAME}" MATCHES "-clang3[.][0-9]?$" )
- string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_NAME}")
- string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-${ANDROID_COMPILER_VERSION}" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+elseif( "${ANDROID_TOOLCHAIN_FOUND}" MATCHES "-clang3[.][0-9]?$" )
+ string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_FOUND}")
+ string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-${ANDROID_COMPILER_VERSION}" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
  if( NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm-${ANDROID_CLANG_VERSION}${ANDROID_NDK_TOOLCHAINS_SUBPATH}/bin/clang${TOOL_OS_SUFFIX}" )
   message( FATAL_ERROR "Could not find the Clang compiler driver" )
  endif()
  set( ANDROID_COMPILER_IS_CLANG 1 )
  set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm-${ANDROID_CLANG_VERSION}${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
-elseif( "${ANDROID_TOOLCHAIN_NAME_ARG}" STREQUAL "clang" )
+elseif( "${ANDROID_TOOLCHAIN_NAME}" STREQUAL "clang" )
  if( NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm${ANDROID_NDK_TOOLCHAINS_SUBPATH}/bin/clang${TOOL_OS_SUFFIX}" )
   message( FATAL_ERROR "Could not find the Clang compiler driver" )
  endif()
- set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+ set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
  set( ANDROID_COMPILER_IS_CLANG 1 )
  set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
 else()
- set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+ set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
  unset( ANDROID_COMPILER_IS_CLANG CACHE )
+endif()
+
+if( ANDROID_COMPILER_IS_CLANG AND ${CMAKE_GENERATOR} MATCHES "Visual Studio.*" )
+ set( CMAKE_GENERATOR_TOOLSET DefaultClang )
 endif()
 
 string( REPLACE "." "" _clang_name "clang${ANDROID_CLANG_VERSION}" )
@@ -1131,11 +1145,10 @@ if( APPLE )
  mark_as_advanced( CMAKE_INSTALL_NAME_TOOL )
 endif()
 
-# Force set compilers because standard identification works badly for us
-include( CMakeForceCompiler )
-CMAKE_FORCE_C_COMPILER( "${CMAKE_C_COMPILER}" GNU )
 if( ANDROID_COMPILER_IS_CLANG )
+ set( CMAKE_C_COMPILER_ID_RUN TRUE )
  set( CMAKE_C_COMPILER_ID Clang )
+ set( CMAKE_C_STANDARD_COMPUTED_DEFAULT 11 )
 endif()
 set( CMAKE_C_PLATFORM_ID Linux )
 if( X86_64 OR MIPS64 OR ARM64_V8A )
@@ -1145,9 +1158,10 @@ else()
 endif()
 set( CMAKE_C_HAS_ISYSROOT 1 )
 set( CMAKE_C_COMPILER_ABI ELF )
-CMAKE_FORCE_CXX_COMPILER( "${CMAKE_CXX_COMPILER}" GNU )
 if( ANDROID_COMPILER_IS_CLANG )
+ set( CMAKE_CXX_COMPILER_ID_RUN TRUE )
  set( CMAKE_CXX_COMPILER_ID Clang)
+ set( CMAKE_CXX_STANDARD_COMPUTED_DEFAULT 98 )
 endif()
 set( CMAKE_CXX_PLATFORM_ID Linux )
 set( CMAKE_CXX_SIZEOF_DATA_PTR ${CMAKE_C_SIZEOF_DATA_PTR} )
@@ -1621,19 +1635,6 @@ if( NOT _CMAKE_IN_TRY_COMPILE )
  endforeach()
  file( WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/android.toolchain.config.cmake" "${__toolchain_config}" )
  unset( __toolchain_config )
-endif()
-
-
-# force cmake to produce / instead of \ in build commands for Ninja generator
-if( CMAKE_GENERATOR MATCHES "Ninja" AND CMAKE_HOST_WIN32 )
- # it is a bad hack after all
- # CMake generates Ninja makefiles with UNIX paths only if it thinks that we are going to build with MinGW
- set( CMAKE_COMPILER_IS_MINGW TRUE ) # tell CMake that we are MinGW
- set( CMAKE_CROSSCOMPILING TRUE )    # stop recursion
- enable_language( C )
- enable_language( CXX )
- # unset( CMAKE_COMPILER_IS_MINGW ) # can't unset because CMake does not convert back-slashes in response files without it
- unset( MINGW )
 endif()
 
 
