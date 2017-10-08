@@ -165,7 +165,6 @@
 #      ANDROID_NDK - environment variable
 #      ANDROID_STANDALONE_TOOLCHAIN - cmake parameter
 #      ANDROID_STANDALONE_TOOLCHAIN - environment variable
-#      ANDROID_NDK - default locations
 #      ANDROID_STANDALONE_TOOLCHAIN - default locations
 #
 #    Make sure to do the following in your scripts:
@@ -185,6 +184,15 @@
 # ------------------------------------------------------------------------------
 
 cmake_minimum_required( VERSION 2.6.3 )
+
+# compatibility with NDK's toolchain
+if( DEFINED ANDROID_PLATFORM )
+  set( ANDROID_NATIVE_API_LEVEL ${ANDROID_PLATFORM} )
+endif()
+
+if( DEFINED ANDROID_TOOLCHAIN )
+  set( ANDROID_TOOLCHAIN_NAME ${ANDROID_TOOLCHAIN} )
+endif()
 
 if( DEFINED CMAKE_CROSSCOMPILING )
  # subsequent toolchain loading is not really needed
@@ -211,24 +219,12 @@ endif()
 # this one not so much
 set( CMAKE_SYSTEM_VERSION 1 )
 
+# this one is also important
+set(CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION ${ANDROID_TOOLCHAIN})
+
 # rpath makes low sense for Android
 set( CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "" )
 set( CMAKE_SKIP_RPATH TRUE CACHE BOOL "If set, runtime paths are not added when using shared libraries." )
-
-# NDK search paths
-set( ANDROID_SUPPORTED_NDK_VERSIONS ${ANDROID_EXTRA_NDK_VERSIONS} -r10d -r10c -r10b -r10 -r9d -r9c -r9b -r9 -r8e -r8d -r8c -r8b -r8 -r7c -r7b -r7 -r6b -r6 -r5c -r5b -r5 "" )
-if( NOT DEFINED ANDROID_NDK_SEARCH_PATHS )
- if( CMAKE_HOST_WIN32 )
-  file( TO_CMAKE_PATH "$ENV{PROGRAMFILES}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS "${ANDROID_NDK_SEARCH_PATHS}" "$ENV{SystemDrive}/NVPACK" )
- else()
-  file( TO_CMAKE_PATH "$ENV{HOME}" ANDROID_NDK_SEARCH_PATHS )
-  set( ANDROID_NDK_SEARCH_PATHS /opt "${ANDROID_NDK_SEARCH_PATHS}/NVPACK" )
- endif()
-endif()
-if( NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
- set( ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH /opt/android-toolchain )
-endif()
 
 # known ABIs
 set( ANDROID_SUPPORTED_ABIS_arm "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
@@ -239,7 +235,7 @@ set( ANDROID_SUPPORTED_ABIS_mips "mips" )
 set( ANDROID_SUPPORTED_ABIS_mips64 "mips64" )
 
 # API level defaults
-set( ANDROID_DEFAULT_NDK_API_LEVEL 8 )
+set( ANDROID_DEFAULT_NDK_API_LEVEL 14 )
 set( ANDROID_DEFAULT_NDK_API_LEVEL_arm64 21 )
 set( ANDROID_DEFAULT_NDK_API_LEVEL_x86 9 )
 set( ANDROID_DEFAULT_NDK_API_LEVEL_x86_64 21 )
@@ -387,30 +383,18 @@ if( NOT ANDROID_NDK )
  __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ENV_ANDROID_STANDALONE_TOOLCHAIN )
 
  if( NOT ANDROID_STANDALONE_TOOLCHAIN )
-  #try to find Android NDK in one of the the default locations
-  set( __ndkSearchPaths )
-  foreach( __ndkSearchPath ${ANDROID_NDK_SEARCH_PATHS} )
-   foreach( suffix ${ANDROID_SUPPORTED_NDK_VERSIONS} )
-    list( APPEND __ndkSearchPaths "${__ndkSearchPath}/android-ndk${suffix}" )
-   endforeach()
-  endforeach()
-  __INIT_VARIABLE( ANDROID_NDK PATH VALUES ${__ndkSearchPaths} )
-  unset( __ndkSearchPaths )
+  # try to find Android standalone toolchain in one of the the default locations
+  __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
 
-  if( ANDROID_NDK )
-   message( STATUS "Using default path for Android NDK: ${ANDROID_NDK}" )
-   message( STATUS "  If you prefer to use a different location, please define a cmake or environment variable: ANDROID_NDK" )
-  else()
-   #try to find Android standalone toolchain in one of the the default locations
-   __INIT_VARIABLE( ANDROID_STANDALONE_TOOLCHAIN PATH ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
-
-   if( ANDROID_STANDALONE_TOOLCHAIN )
-    message( STATUS "Using default path for standalone toolchain ${ANDROID_STANDALONE_TOOLCHAIN}" )
-    message( STATUS "  If you prefer to use a different location, please define the variable: ANDROID_STANDALONE_TOOLCHAIN" )
-   endif( ANDROID_STANDALONE_TOOLCHAIN )
-  endif( ANDROID_NDK )
+  if( ANDROID_STANDALONE_TOOLCHAIN )
+   message( STATUS "Using default path for standalone toolchain ${ANDROID_STANDALONE_TOOLCHAIN}" )
+   message( STATUS "  If you prefer to use a different location, please define the variable: ANDROID_STANDALONE_TOOLCHAIN" )
+  endif( ANDROID_STANDALONE_TOOLCHAIN )
  endif( NOT ANDROID_STANDALONE_TOOLCHAIN )
 endif( NOT ANDROID_NDK )
+if( NOT ANDROID_SDK )
+  __INIT_VARIABLE( ANDROID_SDK PATH ENV_ANDROID_SDK )
+endif()
 
 # remember found paths
 if( ANDROID_NDK )
@@ -442,15 +426,17 @@ elseif( ANDROID_STANDALONE_TOOLCHAIN )
  set( ANDROID_STANDALONE_TOOLCHAIN "${ANDROID_STANDALONE_TOOLCHAIN}" CACHE INTERNAL "Path of the Android standalone toolchain" FORCE )
  set( BUILD_WITH_STANDALONE_TOOLCHAIN True )
 else()
- list(GET ANDROID_NDK_SEARCH_PATHS 0 ANDROID_NDK_SEARCH_PATH)
  message( FATAL_ERROR "Could not find neither Android NDK nor Android standalone toolchain.
     You should either set an environment variable:
       export ANDROID_NDK=~/my-android-ndk
     or
-      export ANDROID_STANDALONE_TOOLCHAIN=~/my-android-toolchain
-    or put the toolchain or NDK in the default path:
-      sudo ln -s ~/my-android-ndk ${ANDROID_NDK_SEARCH_PATH}/android-ndk
-      sudo ln -s ~/my-android-toolchain ${ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH}" )
+      export ANDROID_STANDALONE_TOOLCHAIN=~/my-android-toolchain"
+ )
+endif()
+
+if( ANDROID_SDK )
+ get_filename_component( ANDROID_SDK "${ANDROID_SDK}" ABSOLUTE )
+ set( ANDROID_SDK "${ANDROID_SDK}" CACHE INTERNAL "Path of the Android SDK" FORCE )
 endif()
 
 # android NDK layout
@@ -696,6 +682,9 @@ elseif( ANDROID_ABI STREQUAL "armeabi-v7a")
  set( ANDROID_ARCH_NAME "arm" )
  set( ANDROID_LLVM_TRIPLE "armv7-none-linux-androideabi" )
  set( CMAKE_SYSTEM_PROCESSOR "armv7-a" )
+ if( ANDROID_ARM_NEON )
+  set( NEON true )
+ endif()
 elseif( ANDROID_ABI STREQUAL "armeabi-v7a with VFPV3" )
  set( ARMEABI_V7A true )
  set( ANDROID_NDK_ABI_NAME "armeabi-v7a" )
@@ -714,6 +703,7 @@ elseif( ANDROID_ABI STREQUAL "armeabi-v7a with NEON" )
 else()
  message( SEND_ERROR "Unknown ANDROID_ABI=\"${ANDROID_ABI}\" is specified." )
 endif()
+set( CMAKE_ANDROID_ARCH_ABI ${ANDROID_ABI} )
 
 if( CMAKE_BINARY_DIR AND EXISTS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeSystem.cmake" )
  # really dirty hack
@@ -730,7 +720,7 @@ else()
 endif()
 
 # choose toolchain
-if( ANDROID_TOOLCHAIN_NAME )
+if( ANDROID_TOOLCHAIN_NAME AND NOT ${ANDROID_TOOLCHAIN_NAME} STREQUAL "clang")
  list( FIND __availableToolchains "${ANDROID_TOOLCHAIN_NAME}" __toolchainIdx )
  if( __toolchainIdx EQUAL -1 )
   list( SORT __availableToolchains )
@@ -768,7 +758,7 @@ unset( __toolchainArch )
 if( __toolchainIdx EQUAL -1 )
  message( FATAL_ERROR "No one of available compiler toolchains is able to compile for ${ANDROID_ARCH_NAME} platform." )
 endif()
-list( GET __availableToolchains ${__toolchainIdx} ANDROID_TOOLCHAIN_NAME )
+list( GET __availableToolchains ${__toolchainIdx} ANDROID_TOOLCHAIN_FOUND )
 list( GET __availableToolchainMachines ${__toolchainIdx} ANDROID_TOOLCHAIN_MACHINE_NAME )
 list( GET __availableToolchainCompilerVersions ${__toolchainIdx} ANDROID_COMPILER_VERSION )
 
@@ -807,6 +797,7 @@ else()
   unset( __realApiLevel )
  endif()
  set( ANDROID_NATIVE_API_LEVEL "${ANDROID_NATIVE_API_LEVEL}" CACHE STRING "Android API level for native code" FORCE )
+ set( ANDROID_PLATFORM_LEVEL ${ANDROID_NATIVE_API_LEVEL} )
  set( CMAKE_ANDROID_API ${ANDROID_NATIVE_API_LEVEL} )
  if( CMAKE_VERSION VERSION_GREATER "2.8" )
   list( SORT ANDROID_SUPPORTED_NATIVE_API_LEVELS )
@@ -947,21 +938,32 @@ if( BUILD_WITH_STANDALONE_TOOLCHAIN )
 endif()
 
 # clang
-if( "${ANDROID_TOOLCHAIN_NAME}" STREQUAL "standalone-clang" )
+if( "${ANDROID_TOOLCHAIN_FOUND}" STREQUAL "standalone-clang" )
  set( ANDROID_COMPILER_IS_CLANG 1 )
  execute_process( COMMAND "${ANDROID_CLANG_TOOLCHAIN_ROOT}/bin/clang${TOOL_OS_SUFFIX}" --version OUTPUT_VARIABLE ANDROID_CLANG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE )
  string( REGEX MATCH "[0-9]+[.][0-9]+" ANDROID_CLANG_VERSION "${ANDROID_CLANG_VERSION}")
-elseif( "${ANDROID_TOOLCHAIN_NAME}" MATCHES "-clang3[.][0-9]?$" )
- string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_NAME}")
- string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-${ANDROID_COMPILER_VERSION}" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+elseif( "${ANDROID_TOOLCHAIN_FOUND}" MATCHES "-clang3[.][0-9]?$" )
+ string( REGEX MATCH "3[.][0-9]$" ANDROID_CLANG_VERSION "${ANDROID_TOOLCHAIN_FOUND}")
+ string( REGEX REPLACE "-clang${ANDROID_CLANG_VERSION}$" "-${ANDROID_COMPILER_VERSION}" ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
  if( NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm-${ANDROID_CLANG_VERSION}${ANDROID_NDK_TOOLCHAINS_SUBPATH}/bin/clang${TOOL_OS_SUFFIX}" )
   message( FATAL_ERROR "Could not find the Clang compiler driver" )
  endif()
  set( ANDROID_COMPILER_IS_CLANG 1 )
  set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm-${ANDROID_CLANG_VERSION}${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
+elseif( "${ANDROID_TOOLCHAIN_NAME}" STREQUAL "clang" )
+ if( NOT EXISTS "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm${ANDROID_NDK_TOOLCHAINS_SUBPATH}/bin/clang${TOOL_OS_SUFFIX}" )
+  message( FATAL_ERROR "Could not find the Clang compiler driver" )
+ endif()
+ set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
+ set( ANDROID_COMPILER_IS_CLANG 1 )
+ set( ANDROID_CLANG_TOOLCHAIN_ROOT "${ANDROID_NDK_TOOLCHAINS_PATH}/llvm${ANDROID_NDK_TOOLCHAINS_SUBPATH}" )
 else()
- set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_NAME}" )
+ set( ANDROID_GCC_TOOLCHAIN_NAME "${ANDROID_TOOLCHAIN_FOUND}" )
  unset( ANDROID_COMPILER_IS_CLANG CACHE )
+endif()
+
+if( ANDROID_COMPILER_IS_CLANG AND ${CMAKE_GENERATOR} MATCHES "Visual Studio.*" )
+ set( CMAKE_GENERATOR_TOOLSET DefaultClang )
 endif()
 
 string( REPLACE "." "" _clang_name "clang${ANDROID_CLANG_VERSION}" )
@@ -1123,11 +1125,10 @@ if( APPLE )
  mark_as_advanced( CMAKE_INSTALL_NAME_TOOL )
 endif()
 
-# Force set compilers because standard identification works badly for us
-include( CMakeForceCompiler )
-CMAKE_FORCE_C_COMPILER( "${CMAKE_C_COMPILER}" GNU )
 if( ANDROID_COMPILER_IS_CLANG )
+ set( CMAKE_C_COMPILER_ID_RUN TRUE )
  set( CMAKE_C_COMPILER_ID Clang )
+ set( CMAKE_C_STANDARD_COMPUTED_DEFAULT 11 )
 endif()
 set( CMAKE_C_PLATFORM_ID Linux )
 if( X86_64 OR MIPS64 OR ARM64_V8A )
@@ -1137,9 +1138,10 @@ else()
 endif()
 set( CMAKE_C_HAS_ISYSROOT 1 )
 set( CMAKE_C_COMPILER_ABI ELF )
-CMAKE_FORCE_CXX_COMPILER( "${CMAKE_CXX_COMPILER}" GNU )
 if( ANDROID_COMPILER_IS_CLANG )
+ set( CMAKE_CXX_COMPILER_ID_RUN TRUE )
  set( CMAKE_CXX_COMPILER_ID Clang)
+ set( CMAKE_CXX_STANDARD_COMPUTED_DEFAULT 98 )
 endif()
 set( CMAKE_CXX_PLATFORM_ID Linux )
 set( CMAKE_CXX_SIZEOF_DATA_PTR ${CMAKE_C_SIZEOF_DATA_PTR} )
@@ -1202,7 +1204,7 @@ elseif( ARMEABI OR ARMEABI_V7A)
  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -funwind-tables" )
  if( NOT ANDROID_FORCE_ARM_BUILD AND NOT ARMEABI_V6 )
   set( ANDROID_CXX_FLAGS_RELEASE "-mthumb -fomit-frame-pointer -fno-strict-aliasing" )
-  set( ANDROID_CXX_FLAGS_DEBUG   "-marm -fno-omit-frame-pointer -fno-strict-aliasing" )
+  set( ANDROID_CXX_FLAGS_DEBUG   "-mthumb -fno-omit-frame-pointer -fno-strict-aliasing" )
   if( NOT ANDROID_COMPILER_IS_CLANG )
    set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -finline-limit=64" )
   endif()
@@ -1322,7 +1324,7 @@ set( ANDROID_RELRO                  ${ANDROID_RELRO}                  CACHE BOOL
 mark_as_advanced( ANDROID_NO_UNDEFINED ANDROID_SO_UNDEFINED ANDROID_FUNCTION_LEVEL_LINKING ANDROID_GOLD_LINKER ANDROID_NOEXECSTACK ANDROID_RELRO )
 
 # linker flags
-set( ANDROID_LINKER_FLAGS "" )
+set( ANDROID_LINKER_FLAGS "-Wl,--build-id -Wl,--warn-shared-textrel -Wl,--fatal-warnings" )
 
 if( ARMEABI_V7A )
  # this is *required* to use the following linker flags that routes around
@@ -1363,6 +1365,8 @@ if( ANDROID_COMPILER_VERSION VERSION_EQUAL "4.6" )
  endif()
 endif() # version 4.6
 
+set( ANDROID_ASM_FLAGS "${ANDROID_CXX_FLAGS}" )
+
 if( ANDROID_NOEXECSTACK )
  if( ANDROID_COMPILER_IS_CLANG )
   set( ANDROID_CXX_FLAGS    "${ANDROID_CXX_FLAGS} -Xclang -mnoexecstack" )
@@ -1377,6 +1381,7 @@ if( ANDROID_RELRO )
 endif()
 
 if( ANDROID_COMPILER_IS_CLANG )
+ set( CXX_FLAGS "-std=c++14" )
  set( ANDROID_CXX_FLAGS "-target ${ANDROID_LLVM_TRIPLE} -Qunused-arguments ${ANDROID_CXX_FLAGS}" )
  if( BUILD_WITH_ANDROID_NDK )
   set( ANDROID_CXX_FLAGS "-gcc-toolchain ${ANDROID_TOOLCHAIN_ROOT} ${ANDROID_CXX_FLAGS}" )
@@ -1384,7 +1389,7 @@ if( ANDROID_COMPILER_IS_CLANG )
 endif()
 
 # cache flags
-set( CMAKE_CXX_FLAGS           ""                        CACHE STRING "c++ flags" )
+set( CMAKE_CXX_FLAGS           "${CXX_FLAGS}"            CACHE STRING "c++ flags" )
 set( CMAKE_C_FLAGS             ""                        CACHE STRING "c flags" )
 set( CMAKE_CXX_FLAGS_RELEASE   "-O3 -DNDEBUG"            CACHE STRING "c++ Release flags" )
 set( CMAKE_C_FLAGS_RELEASE     "-O3 -DNDEBUG"            CACHE STRING "c Release flags" )
@@ -1403,6 +1408,7 @@ set( ANDROID_LINKER_FLAGS      "${ANDROID_LINKER_FLAGS}"      CACHE INTERNAL "An
 # finish flags
 set( CMAKE_CXX_FLAGS           "${ANDROID_CXX_FLAGS} ${CMAKE_CXX_FLAGS}" )
 set( CMAKE_C_FLAGS             "${ANDROID_CXX_FLAGS} ${CMAKE_C_FLAGS}" )
+set( CMAKE_ASM_FLAGS           "${ANDROID_ASM_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" )
 set( CMAKE_CXX_FLAGS_RELEASE   "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELEASE}" )
 set( CMAKE_C_FLAGS_RELEASE     "${ANDROID_CXX_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELEASE}" )
 set( CMAKE_CXX_FLAGS_DEBUG     "${ANDROID_CXX_FLAGS_DEBUG} ${CMAKE_CXX_FLAGS_DEBUG}" )
@@ -1526,7 +1532,7 @@ set( BUILD_ANDROID True )
 set( CMAKE_FIND_ROOT_PATH "${ANDROID_TOOLCHAIN_ROOT}/bin" "${ANDROID_TOOLCHAIN_ROOT}/${ANDROID_TOOLCHAIN_MACHINE_NAME}" "${ANDROID_SYSROOT}" "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_PREFIX}/share" )
 
 # only search for libraries and includes in the ndk toolchain
-set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
+set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH )
 set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY )
 set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY )
 
@@ -1612,19 +1618,6 @@ if( NOT _CMAKE_IN_TRY_COMPILE )
 endif()
 
 
-# force cmake to produce / instead of \ in build commands for Ninja generator
-if( CMAKE_GENERATOR MATCHES "Ninja" AND CMAKE_HOST_WIN32 )
- # it is a bad hack after all
- # CMake generates Ninja makefiles with UNIX paths only if it thinks that we are going to build with MinGW
- set( CMAKE_COMPILER_IS_MINGW TRUE ) # tell CMake that we are MinGW
- set( CMAKE_CROSSCOMPILING TRUE )    # stop recursion
- enable_language( C )
- enable_language( CXX )
- # unset( CMAKE_COMPILER_IS_MINGW ) # can't unset because CMake does not convert back-slashes in response files without it
- unset( MINGW )
-endif()
-
-
 # Variables controlling behavior or set by cmake toolchain:
 #   ANDROID_ABI : "armeabi-v7a" (default), "armeabi", "armeabi-v7a with NEON", "armeabi-v7a with VFPV3", "armeabi-v6 with VFP", "x86", "mips", "arm64-v8a", "x86_64", "mips64"
 #   ANDROID_NATIVE_API_LEVEL : 3,4,5,8,9,14,15,16,17,18,19,21 (depends on NDK version)
@@ -1688,6 +1681,4 @@ endif()
 # Defaults:
 #   ANDROID_DEFAULT_NDK_API_LEVEL
 #   ANDROID_DEFAULT_NDK_API_LEVEL_${ARCH}
-#   ANDROID_NDK_SEARCH_PATHS
 #   ANDROID_SUPPORTED_ABIS_${ARCH}
-#   ANDROID_SUPPORTED_NDK_VERSIONS
