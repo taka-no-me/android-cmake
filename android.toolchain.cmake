@@ -67,6 +67,8 @@
 #            this ABI target is used by default
 #        "armeabi-v7a with NEON" - same as armeabi-v7a, but
 #            sets NEON as floating-point unit
+#        "armeabi-v7a with NEON FP16" - same as armeabi-v7a, but
+#            sets neon-fp16 as floating-point unit
 #        "armeabi-v7a with VFPV3" - same as armeabi-v7a, but
 #            sets VFPV3 as floating-point unit (has 32 registers instead of 16)
 #        "armeabi-v6 with VFP" - tuned for ARMv6 processors having VFP
@@ -231,7 +233,7 @@ if( NOT DEFINED ANDROID_STANDALONE_TOOLCHAIN_SEARCH_PATH )
 endif()
 
 # known ABIs
-set( ANDROID_SUPPORTED_ABIS_arm "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
+set( ANDROID_SUPPORTED_ABIS_arm "armeabi-v7a;armeabi;armeabi-v7a with NEON;armeabi-v7a with NEON FP16;armeabi-v7a with VFPV3;armeabi-v6 with VFP" )
 set( ANDROID_SUPPORTED_ABIS_arm64 "arm64-v8a" )
 set( ANDROID_SUPPORTED_ABIS_x86 "x86" )
 set( ANDROID_SUPPORTED_ABIS_x86_64 "x86_64" )
@@ -711,6 +713,15 @@ elseif( ANDROID_ABI STREQUAL "armeabi-v7a with NEON" )
  set( CMAKE_SYSTEM_PROCESSOR "armv7-a" )
  set( VFPV3 true )
  set( NEON true )
+elseif( ANDROID_ABI STREQUAL "armeabi-v7a with NEON FP16" )
+ set( ARMEABI_V7A true )
+ set( ANDROID_NDK_ABI_NAME "armeabi-v7a" )
+ set( ANDROID_ARCH_NAME "arm" )
+ set( ANDROID_LLVM_TRIPLE "armv7-none-linux-androideabi" )
+ set( CMAKE_SYSTEM_PROCESSOR "armv7-a" )
+ set( VFPV3 true )
+ set( NEON true )
+ set( FP16 true )
 else()
  message( SEND_ERROR "Unknown ANDROID_ABI=\"${ANDROID_ABI}\" is specified." )
 endif()
@@ -1248,7 +1259,11 @@ endif()
 if( ARMEABI_V7A )
  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -march=armv7-a -mfloat-abi=softfp" )
  if( NEON )
-  set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=neon" )
+  if( FP16 )
+    set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=neon-fp16 -mfp16-format=ieee" )
+  else()
+    set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=neon" )
+  endif()
  elseif( VFPV3 )
   set( ANDROID_CXX_FLAGS "${ANDROID_CXX_FLAGS} -mfpu=vfpv3" )
  else()
@@ -1626,7 +1641,7 @@ endif()
 
 
 # Variables controlling behavior or set by cmake toolchain:
-#   ANDROID_ABI : "armeabi-v7a" (default), "armeabi", "armeabi-v7a with NEON", "armeabi-v7a with VFPV3", "armeabi-v6 with VFP", "x86", "mips", "arm64-v8a", "x86_64", "mips64"
+#   ANDROID_ABI : "armeabi-v7a" (default), "armeabi", "armeabi-v7a with NEON", "armeabi-v7a with NEON FP16", "armeabi-v7a with VFPV3", "armeabi-v6 with VFP", "x86", "mips", "arm64-v8a", "x86_64", "mips64"
 #   ANDROID_NATIVE_API_LEVEL : 3,4,5,8,9,14,15,16,17,18,19,21 (depends on NDK version)
 #   ANDROID_STL : gnustl_static/gnustl_shared/stlport_static/stlport_shared/gabi++_static/gabi++_shared/system_re/system/none
 #   ANDROID_FORBID_SYGWIN : ON/OFF
@@ -1655,6 +1670,7 @@ endif()
 #   ARMEABI_V7A : TRUE for arm v7a
 #   ARM64_V8A : TRUE for arm64-v8a
 #   NEON : TRUE if NEON unit is enabled
+#   FP16 : TRUE if NEON fp16 unit is enabled
 #   VFPV3 : TRUE if VFP version 3 is enabled
 #   X86 : TRUE if configured for x86
 #   X86_64 : TRUE if configured for x86_64
