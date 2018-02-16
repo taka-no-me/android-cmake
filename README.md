@@ -1,6 +1,6 @@
 # android-cmake
 
-CMake is great, and so is Android. This is a collection of CMake scripts that may be useful to the Android NDK community. It is based on experience from porting OpenCV library to Android: http://opencv.org/platforms/android.html
+CMake is great, and so is Android. This is a collection of CMake scripts that may be useful to the Android NDK community. It is based on experience from porting OpenCV library to Android: https://opencv.org/platforms/android/
 
 Main goal is to share these scripts so that devs that use CMake as their build system may easily compile native code for Android.
 
